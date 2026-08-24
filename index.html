@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>FleetSquad — Mobile Fleet Maintenance &amp; Repair | ASE Master Techs</title>
+<meta name="description" content="FleetSquad brings mobile ASE Master Techs to your location. Preventive maintenance, mobile fleet repair, diagnostics, emergency roadside and inspections — we come to you.">
+<link rel="icon" href="assets/img/logo-shield.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/css/variables.css">
+<link rel="stylesheet" href="assets/css/base.css">
+<link rel="stylesheet" href="assets/css/components.css">
+<link rel="stylesheet" href="assets/css/site.css">
+</head>
+<body>
+
+<div data-site-header></div>
+
+<main>
+
+  <!-- ====================================================================
+       Hero
+       ==================================================================== -->
+  <section class="hero">
+    <!-- Full-width ground strip sits behind the fleet crop so the wet-lot
+         reflection reaches both edges exactly as it does in the PSD. -->
+    <div class="hero-ground" aria-hidden="true">
+      <img src="assets/img/hero-ground.jpg" alt="" width="1800" height="166">
+    </div>
+    <div class="hero-photo">
+      <picture>
+        <source media="(min-width: 992px)" srcset="assets/img/hero-fleet-desktop.jpg">
+        <img src="assets/img/hero-fleet-mobile.jpg" alt="A FleetSquad-serviced fleet of semi-trucks, box trucks, a pickup and a sedan on a wet lot at dusk" width="1800" height="675" fetchpriority="high">
+      </picture>
+    </div>
+
+    <div class="container hero-inner">
+      <div class="hero-copy">
+        <h1>Keep Every<br>Vehicle Mission-Ready</h1>
+
+        <p class="hero-sub">
+          <span class="show-desktop-inline">FleetSquad brings mobile ASE Master Techs to your location so your fleet stays on the road and your business stays ahead.</span>
+          <span class="show-mobile-inline">ASE Master Techs to your location so your fleet stays on the road</span>
+        </p>
+
+        <ul class="hero-checks">
+          <li class="hero-check"><i data-icon="check"></i>ASE Master Techs Come to You</li>
+          <li class="hero-check"><i data-icon="check"></i>Minimize Downtime</li>
+          <li class="hero-check"><i data-icon="check"></i>10+ Vehicles? We Scale With You</li>
+          <li class="hero-check"><i data-icon="check"></i>Same-Day Available</li>
+        </ul>
+
+        <a class="btn btn-primary btn-hero" href="get-estimate.html">Get Estimate</a>
+      </div>
+
+      <!-- Desktop-only contact panel from the PSD -->
+      <aside class="hero-contact">
+        <a class="hero-contact-row" href="tel:18883916324">
+          <i data-icon="phone"></i><span>1-888-391-MECH</span>
+        </a>
+        <div class="hero-contact-row">
+          <i data-icon="clock"></i><span>Everyday 9am to 9pm</span>
+        </div>
+        <div class="hero-contact-row">
+          <i data-icon="globe"></i><span>Network 24-7</span>
+        </div>
+      </aside>
+    </div>
+
+    <div class="hero-photo-spacer"></div>
+  </section>
+
+  <!-- ====================================================================
+       Counters + partner logos
+       ==================================================================== -->
+  <section class="proof">
+    <div class="container">
+      <div class="stats-bar" id="statsBar"><!-- rendered by home.js --></div>
+
+      <p class="trust-title">
+        <span class="show-desktop-inline">Trusted by fleet operators across North America</span>
+        <span class="show-mobile-inline">Trusted by fleet operators<br>across North America</span>
+      </p>
+
+      <div class="brand-row" id="brandRow"><!-- rendered by home.js --></div>
+    </div>
+  </section>
+
+  <!-- The light "sheet" rides up over the navy on phones, per the mobile PSD -->
+  <div class="sheet">
+
+    <!-- ==================================================================
+         Services
+         ================================================================== -->
+    <section class="section">
+      <div class="container">
+        <div class="services-head">
+          <h2>
+            <span class="show-desktop-inline">Comprehensive Mobile Fleet Services</span>
+            <span class="show-mobile-inline">Our Services</span>
+          </h2>
+          <p>ASE Master Techs. Advanced Tools. We Come to You.</p>
+        </div>
+
+        <div class="services-grid" id="servicesGrid"><!-- rendered by home.js --></div>
+
+        <a class="btn btn-navy btn-block services-all" href="services.html">View All Services</a>
+      </div>
+    </section>
+
+    <!-- ==================================================================
+         Phone-only widgets (zip check + fleet dashboard preview)
+         ================================================================== -->
+    <section class="section phone-only" style="padding-top:0">
+      <div class="container stack" style="gap:var(--sp-6)">
+
+        <div class="widget-card">
+          <h3>Book Services</h3>
+          <p class="text-muted mb-3" style="font-size:15px">Check if we are in your State</p>
+          <form id="zipForm" novalidate>
+            <input class="input" type="text" id="zipInput" placeholder="Enter zip code" inputmode="numeric" maxlength="5" aria-label="Zip code">
+            <button class="btn btn-primary btn-block mt-3" type="submit">Check</button>
+          </form>
+          <p id="zipResult" class="hint" role="status"></p>
+          <div class="zip-help">
+            <i data-icon="phone-ring"></i>
+            <div>
+              <small>Need immediate help?</small>
+              <a href="tel:18883916324">Call 1-888-391-MECH</a>
+            </div>
+          </div>
+        </div>
+
+        <div class="widget-card">
+          <h3>Fleet Dashboard</h3>
+          <div class="row-between mb-4">
+            <strong style="font-size:19px;color:var(--ink-900)">Overview</strong>
+            <select class="select" id="dashRange" style="width:auto" aria-label="Date range">
+              <option>This Month</option>
+              <option>Last Month</option>
+              <option>This Quarter</option>
+            </select>
+          </div>
+          <div class="mini-kpis" id="miniKpis"><!-- rendered by home.js --></div>
+          <a class="btn btn-primary btn-block mt-4" href="login.html">View Full Dashboard</a>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- ==================================================================
+         Why fleets choose FleetSquad
+         ================================================================== -->
+    <section class="section" style="padding-top:0">
+      <div class="container">
+        <div class="why-band">
+          <h2>Why Fleets Choose FleetSquad</h2>
+          <div class="why-grid" id="whyGrid"><!-- rendered by home.js --></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ==================================================================
+         Vehicle types
+         ================================================================== -->
+    <section class="section" style="padding-top:0">
+      <div class="container">
+        <div class="vehicles-card">
+          <h2>Built FleetSquad&trade; Tough</h2>
+          <p>Whether you run trucks, vans, pickups, or cars&mdash;we keep them all moving.</p>
+          <div class="vehicles-grid" id="vehiclesGrid"><!-- rendered by home.js --></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ==================================================================
+         Industries served
+         ================================================================== -->
+    <section class="section" style="padding-top:0">
+      <div class="container">
+        <div class="section-head">
+          <h2>Industries We Serve</h2>
+          <p>Purpose-built maintenance programmes for the way each industry actually runs.</p>
+        </div>
+        <div class="grid grid-3" id="industriesGrid"><!-- rendered by home.js --></div>
+      </div>
+    </section>
+
+    <!-- ==================================================================
+         Reviews + customer rating
+         ================================================================== -->
+    <section class="section" style="padding-top:0">
+      <div class="container">
+        <div class="section-head">
+          <h2>What Fleet Operators Say</h2>
+          <p>Real feedback from the fleets we service every week.</p>
+        </div>
+
+        <div class="rating-summary mb-8" id="ratingSummary"><!-- rendered by home.js --></div>
+
+        <div class="grid grid-3" id="testimonials"><!-- rendered by home.js --></div>
+
+        <div class="text-center mt-8">
+          <a class="btn btn-outline" href="reviews.html">Read all reviews</a>
+        </div>
+      </div>
+    </section>
+
+    <!-- ==================================================================
+         Blog preview
+         ================================================================== -->
+    <section class="section" style="padding-top:0">
+      <div class="container">
+        <div class="section-head section-head--left row-between row-wrap">
+          <div>
+            <h2>From the FleetSquad Blog</h2>
+            <p>Practical guidance on uptime, compliance and fleet cost control.</p>
+          </div>
+          <a class="btn btn-outline" href="blog.html">View all posts</a>
+        </div>
+        <div class="grid grid-3" id="blogPreview"><!-- rendered by home.js --></div>
+      </div>
+    </section>
+
+    <!-- ==================================================================
+         Closing CTA
+         ================================================================== -->
+    <section class="section" style="padding-top:0">
+      <div class="container">
+        <div class="cta-band">
+          <div class="cta-inner">
+            <h2>
+              <span class="show-desktop-inline">Ready to Experience Fleet Maintenance That Comes to You?</span>
+              <span class="show-mobile-inline">ASE Master Techs.<br>We Come to You.</span>
+            </h2>
+            <p>
+              <span class="show-desktop-inline">Book service today and keep your fleet mission-ready.</span>
+              <span class="show-mobile-inline">Less downtime. Lower costs. Happier drivers.</span>
+            </p>
+            <a class="btn btn-primary" href="get-estimate.html">Get Estimate</a>
+          </div>
+          <img class="cta-shield" src="assets/img/logo-shield.png" alt="" width="256" height="416">
+          <div class="cta-photo">
+            <img src="assets/img/cta-van.jpg" alt="A branded FleetSquad mobile service van with a technician on site" width="1200" height="462" loading="lazy">
+          </div>
+        </div>
+      </div>
+    </section>
+
+  </div><!-- /.sheet -->
+</main>
+
+<div data-site-footer></div>
+
+<script src="assets/js/icons.js"></script>
+<script src="assets/js/core.js"></script>
+<script src="assets/js/data.js"></script>
+<script src="assets/js/store.js"></script>
+<script src="assets/js/site.js"></script>
+<script src="assets/js/home.js"></script>
+</body>
+</html>

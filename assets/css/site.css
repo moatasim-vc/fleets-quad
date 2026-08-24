@@ -1,0 +1,1007 @@
+/* ==========================================================================
+   FleetSquad — Public marketing site
+   Layout values are derived from the supplied desktop (4288px) and mobile
+   (1180px) PSD exports, normalised to a 1440px / 393px design canvas.
+   Mobile-first: the phone layout is the default, desktop rules start at 992px.
+   ========================================================================== */
+
+/* --------------------------------------------------------------------------
+   Brand lockup
+   -------------------------------------------------------------------------- */
+
+.brand { display: inline-flex; align-items: center; gap: 12px; }
+.brand-mark { width: 42px; flex: none; }
+.brand-text { display: flex; align-items: center; gap: 11px; }
+.brand-word {
+  font-size: 22px;
+  font-weight: 800;
+  letter-spacing: .012em;
+  line-height: 1;
+  color: #fff;
+  white-space: nowrap;
+}
+.brand-word i { font-style: normal; color: var(--blue-500); }
+.brand-tag {
+  padding-left: 11px;
+  border-left: 1px solid rgba(255, 255, 255, .34);
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.28;
+  color: rgba(255, 255, 255, .9);
+  white-space: nowrap;
+}
+.brand--dark .brand-word { color: var(--navy-900); }
+.brand--dark .brand-word i { color: var(--blue-600); }
+.brand--dark .brand-tag { color: var(--ink-500); border-left-color: var(--line); }
+
+@media (min-width: 992px) {
+  .brand-mark { width: 58px; }
+  .brand-word { font-size: 33px; }
+  .brand-tag { font-size: 14px; padding-left: 14px; }
+}
+
+/* --------------------------------------------------------------------------
+   Site header — navy gradient bar sitting directly above the hero
+   -------------------------------------------------------------------------- */
+
+.site-header {
+  position: relative;
+  z-index: 90;
+  background: var(--grad-header);
+  border-bottom: 1px solid rgba(255, 255, 255, .09);
+}
+.site-header .container {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-5);
+  height: 62px;
+}
+
+/* The phone layout puts the number on the left and the mark dead centre. */
+.header-phone {
+  font-size: 13px;
+  font-weight: 800;
+  color: #fff;
+  letter-spacing: .01em;
+}
+.site-header .brand {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+}
+.site-header .brand .brand-text { display: none; }
+
+.nav-desktop { display: none; }
+.header-actions { display: flex; align-items: center; gap: var(--sp-4); }
+
+.hamburger {
+  width: 34px; height: 26px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: 3px 0;
+  flex: none;
+}
+.hamburger i {
+  display: block;
+  height: 3px;
+  border-radius: 2px;
+  background: #fff;
+  transition: transform var(--transition), opacity var(--transition);
+}
+.hamburger i:nth-child(2) { width: 100%; }
+body.drawer-open .hamburger i:nth-child(1) { transform: translateY(8px) rotate(45deg); }
+body.drawer-open .hamburger i:nth-child(2) { opacity: 0; }
+body.drawer-open .hamburger i:nth-child(3) { transform: translateY(-8px) rotate(-45deg); }
+
+@media (min-width: 992px) {
+  .site-header .container { height: 112px; }
+  .header-phone { display: none; }
+  .site-header .brand { position: static; transform: none; }
+  .site-header .brand .brand-text { display: flex; }
+  .nav-desktop { display: flex; align-items: center; gap: 34px; }
+}
+
+/* Desktop dropdown navigation ---------------------------------------------- */
+
+.nav-item { position: relative; }
+.nav-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 10px 0;
+  font-size: 17px;
+  font-weight: 600;
+  color: #fff;
+  background: none;
+  white-space: nowrap;
+}
+.nav-link svg { width: 15px; height: 15px; transition: transform var(--transition); }
+.nav-link:hover { color: var(--blue-500); }
+.nav-item:hover .nav-link svg,
+.nav-item:focus-within .nav-link svg { transform: rotate(180deg); }
+
+.nav-panel {
+  position: absolute;
+  top: calc(100% + 14px);
+  left: 50%;
+  transform: translate(-50%, -8px);
+  min-width: 268px;
+  padding: 10px;
+  background: #fff;
+  border-radius: var(--r-md);
+  box-shadow: var(--sh-lg);
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity var(--transition), transform var(--transition), visibility var(--transition);
+}
+/* A transparent bridge keeps the panel open while the pointer travels to it. */
+.nav-panel::before { content: ""; position: absolute; left: 0; right: 0; top: -16px; height: 16px; }
+.nav-item:hover .nav-panel,
+.nav-item:focus-within .nav-panel { opacity: 1; visibility: visible; transform: translate(-50%, 0); }
+.nav-panel a {
+  display: block;
+  padding: 10px 14px;
+  border-radius: var(--r-xs);
+  font-size: var(--fs-base);
+  font-weight: 600;
+  color: var(--ink-700);
+}
+.nav-panel a:hover { background: var(--blue-050); color: var(--blue-600); }
+
+/* --------------------------------------------------------------------------
+   Slide-in drawer — the hamburger menu on every breakpoint
+   -------------------------------------------------------------------------- */
+
+.drawer-scrim {
+  position: fixed;
+  inset: 0;
+  background: rgba(3, 12, 28, .55);
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity var(--transition), visibility var(--transition);
+  z-index: 120;
+}
+body.drawer-open .drawer-scrim { opacity: 1; visibility: visible; }
+
+.drawer {
+  position: fixed;
+  top: 0; right: 0;
+  width: min(400px, 88vw);
+  height: 100dvh;
+  background: var(--navy-900);
+  z-index: 130;
+  display: flex;
+  flex-direction: column;
+  transform: translateX(102%);
+  transition: transform 240ms cubic-bezier(.4, 0, .2, 1);
+}
+body.drawer-open .drawer { transform: translateX(0); }
+
+.drawer-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-4);
+  padding: var(--sp-5);
+  border-bottom: 1px solid rgba(255, 255, 255, .12);
+}
+.drawer-close { color: #fff; width: 36px; height: 36px; display: flex; align-items: center; justify-content: center; border-radius: var(--r-sm); }
+.drawer-close:hover { background: rgba(255, 255, 255, .1); }
+.drawer-close svg { width: 20px; height: 20px; }
+
+.drawer-body { flex: 1 1 auto; overflow-y: auto; padding: var(--sp-4) var(--sp-5) var(--sp-8); }
+
+.drawer-group + .drawer-group { border-top: 1px solid rgba(255, 255, 255, .1); }
+.drawer-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: 15px 0;
+  font-size: var(--fs-lg);
+  font-weight: 700;
+  color: #fff;
+  text-align: left;
+}
+.drawer-toggle svg { width: 18px; height: 18px; color: rgba(255, 255, 255, .6); transition: transform var(--transition); }
+.drawer-group.is-open .drawer-toggle svg { transform: rotate(180deg); }
+.drawer-sub { display: none; padding: 0 0 12px 2px; }
+.drawer-group.is-open .drawer-sub { display: block; }
+.drawer-sub a {
+  display: block;
+  padding: 9px 0 9px 14px;
+  border-left: 2px solid rgba(255, 255, 255, .16);
+  font-size: var(--fs-base);
+  color: rgba(255, 255, 255, .78);
+}
+.drawer-sub a:hover { color: #fff; border-left-color: var(--blue-500); }
+
+.drawer-foot { padding: var(--sp-5); border-top: 1px solid rgba(255, 255, 255, .12); display: grid; gap: var(--sp-3); }
+.drawer-call {
+  display: flex; align-items: center; justify-content: center; gap: 9px;
+  font-weight: 700; color: #fff; font-size: var(--fs-base);
+}
+.drawer-call svg { width: 17px; height: 17px; color: var(--blue-500); }
+
+/* --------------------------------------------------------------------------
+   Hero
+   -------------------------------------------------------------------------- */
+
+.hero {
+  position: relative;
+  overflow: hidden;
+  background: var(--grad-hero);
+  padding-top: var(--sp-8);
+  isolation: isolate;
+}
+
+/* Bottom-anchored fleet photograph. A mask — rather than a colour overlay —
+   fades it into the navy, so the blend holds wherever the gradient sits. */
+.hero-photo,
+.hero-ground {
+  position: absolute;
+  left: 0; right: 0; bottom: 0;
+  z-index: -1;
+  pointer-events: none;
+}
+.hero-photo img,
+.hero-ground img { width: 100%; display: block; }
+
+.hero-photo {
+  -webkit-mask-image: linear-gradient(to bottom, transparent 0%, #000 30%);
+  mask-image: linear-gradient(to bottom, transparent 0%, #000 30%);
+}
+.hero-ground {
+  display: none;
+  z-index: -2;
+  -webkit-mask-image: linear-gradient(to bottom, transparent 0%, #000 55%);
+  mask-image: linear-gradient(to bottom, transparent 0%, #000 55%);
+}
+/* Extra darkening across the top third keeps the headline legible. */
+.hero-photo::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(to bottom, rgba(0, 18, 37, .8) 0%, rgba(0, 18, 37, .25) 34%, rgba(0, 18, 37, 0) 62%);
+}
+
+.hero-inner { position: relative; }
+.hero-copy { max-width: 640px; }
+
+.hero h1 {
+  color: #fff;
+  font-size: 30px;
+  line-height: 1.18;
+  letter-spacing: -0.015em;
+  margin-bottom: 16px;
+}
+.hero-sub {
+  color: rgba(255, 255, 255, .93);
+  font-size: 17px;
+  line-height: 1.62;
+  margin-bottom: 26px;
+  max-width: 34ch;
+}
+
+.hero-checks { display: grid; gap: 14px; margin-bottom: 28px; }
+.hero-check { display: flex; align-items: center; gap: 13px; color: #fff; font-size: 16px; font-weight: 600; }
+.hero-check i {
+  width: 24px; height: 24px;
+  flex: none;
+  border-radius: 6px;
+  background: var(--blue-600);
+  display: flex; align-items: center; justify-content: center;
+}
+.hero-check i svg { width: 15px; height: 15px; color: #fff; }
+
+.hero .btn-hero {
+  width: 100%;
+  padding: 14px 30px;
+  font-size: 17px;
+  border-radius: var(--r-sm);
+}
+
+/* Space at the bottom of the hero so the photograph has room to sit. */
+.hero-photo-spacer { height: 190px; }
+
+/* Contact card — desktop only, mirrors the panel in the PSD. */
+.hero-contact { display: none; }
+
+@media (min-width: 992px) {
+  .hero { padding-top: 78px; }
+  /* The desktop crop starts 31% into the original composition, so anchoring it
+     to the right at that offset reproduces the PSD framing exactly. The left
+     edge is masked away into the ground strip underneath it. */
+  .hero-photo {
+    left: 31%;
+    -webkit-mask-image: linear-gradient(to bottom, transparent 0%, #000 26%), linear-gradient(to right, transparent 0%, #000 16%);
+    mask-image: linear-gradient(to bottom, transparent 0%, #000 26%), linear-gradient(to right, transparent 0%, #000 16%);
+    -webkit-mask-composite: source-in;
+    mask-composite: intersect;
+  }
+  .hero-photo::after {
+    background: linear-gradient(to bottom, rgba(0, 18, 37, .72) 0%, rgba(0, 18, 37, .18) 30%, rgba(0, 18, 37, 0) 58%);
+  }
+  .hero-ground { display: block; }
+  /* On desktop the composition dissolves into the white page just above the
+     counter bar, matching the PSD. */
+  .hero::after {
+    content: "";
+    position: absolute;
+    left: 0; right: 0; bottom: 0;
+    height: 150px;
+    background: linear-gradient(to bottom, rgba(255, 255, 255, 0) 0%, rgba(255, 255, 255, .82) 62%, #fff 100%);
+    pointer-events: none;
+    z-index: 1;
+  }
+  .hero-inner { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--sp-8); }
+  .hero-copy { max-width: 680px; flex: 0 1 auto; }
+  .hero h1 { font-size: 62px; line-height: 1.1; margin-bottom: 22px; }
+  .hero-sub { font-size: 18px; line-height: 1.72; max-width: 46ch; margin-bottom: 34px; }
+  .hero-checks { gap: 17px; margin-bottom: 38px; }
+  .hero-check { font-size: 17px; }
+  .hero .btn-hero { width: auto; padding: 17px 44px; font-size: 18px; }
+  .hero-photo-spacer { height: 300px; }
+
+  .hero-contact {
+    display: block;
+    flex: 0 0 404px;
+    padding: 4px 30px;
+    border: 1px solid rgba(255, 255, 255, .22);
+    border-radius: var(--r-lg);
+    background: rgba(255, 255, 255, .04);
+    backdrop-filter: blur(3px);
+  }
+  .hero-contact-row {
+    display: flex;
+    align-items: center;
+    gap: 18px;
+    padding: 24px 0;
+  }
+  .hero-contact-row + .hero-contact-row { border-top: 1px solid rgba(255, 255, 255, .2); }
+  .hero-contact-row i {
+    width: 56px; height: 56px;
+    flex: none;
+    border-radius: 50%;
+    background: var(--blue-600);
+    display: flex; align-items: center; justify-content: center;
+  }
+  .hero-contact-row i svg { width: 27px; height: 27px; color: #fff; }
+  .hero-contact-row span { color: #fff; font-size: 23px; font-weight: 700; letter-spacing: .01em; }
+}
+
+/* --------------------------------------------------------------------------
+   Proof block — counters + partner logos
+   Phone: stays on the navy. Desktop: sits on white, per the two PSDs.
+   -------------------------------------------------------------------------- */
+
+.proof { background: var(--grad-hero); background-attachment: local; padding-bottom: var(--sp-7); }
+
+.stats-bar {
+  border-radius: var(--r-lg);
+  background: rgba(255, 255, 255, .045);
+  border: 1px solid rgba(255, 255, 255, .1);
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+.stat {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 20px 12px;
+}
+/* Hairline grid dividers between the four counters. */
+.stat:nth-child(odd)  { border-right: 1px solid rgba(255, 255, 255, .16); }
+.stat:nth-child(1), .stat:nth-child(2) { border-bottom: 1px solid rgba(255, 255, 255, .16); }
+.stat svg { width: 32px; height: 32px; color: var(--blue-500); flex: none; }
+.stat-num { color: #fff; font-size: 24px; font-weight: 700; line-height: 1.15; letter-spacing: -0.01em; }
+.stat-label { color: rgba(255, 255, 255, .88); font-size: 12px; font-weight: 600; }
+
+.trust-title {
+  text-align: center;
+  color: rgba(255, 255, 255, .92);
+  font-size: 15px;
+  font-weight: 700;
+  margin: var(--sp-7) 0 var(--sp-5);
+}
+.brand-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 14px 18px;
+}
+.brand-row img { height: 38px; width: auto; opacity: .82; filter: grayscale(1) brightness(1.75); }
+/* The PSD's phone screen only carries three of the six partner marks. */
+.brand-row img:nth-child(n + 4) { display: none; }
+
+@media (min-width: 992px) {
+  .proof { background: var(--surface); padding-bottom: var(--sp-9); }
+  .stats-bar {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    background: var(--navy-800);
+    border: 0;
+    box-shadow: var(--sh-md);
+    margin-top: -56px;
+    position: relative;
+    z-index: 3;
+  }
+  .stat { padding: 34px 20px; justify-content: center; gap: 20px; border-bottom: 0 !important; }
+  .stat:nth-child(odd) { border-right: 0; }
+  .stat + .stat { border-left: 1px solid rgba(255, 255, 255, .18); }
+  .stat svg { width: 50px; height: 50px; }
+  .stat-num { font-size: 38px; }
+  .stat-label { font-size: 16px; }
+
+  .trust-title { color: var(--ink-500); font-size: 17px; margin: var(--sp-8) 0 var(--sp-6); }
+  .brand-row { gap: 24px 48px; }
+  .brand-row img { height: 52px; opacity: 1; filter: grayscale(1); }
+  .brand-row img:nth-child(n + 4) { display: block; }
+}
+
+/* --------------------------------------------------------------------------
+   White "sheet" — on phones the light content rides up over the navy with a
+   large corner radius, exactly as drawn in the mobile PSD.
+   -------------------------------------------------------------------------- */
+
+.sheet {
+  position: relative;
+  z-index: 2;
+  background: var(--surface-3);
+  border-radius: 38px 38px 0 0;
+  margin-top: -30px;
+  padding-top: var(--sp-8);
+}
+@media (min-width: 992px) {
+  .sheet { background: var(--surface); border-radius: 0; margin-top: 0; padding-top: 0; }
+}
+
+/* --------------------------------------------------------------------------
+   Services
+   Phone: compact rows with a thumbnail and a chevron.
+   Desktop: three-up photo cards with an icon badge and a Learn More link.
+   -------------------------------------------------------------------------- */
+
+.services-head { margin-bottom: var(--sp-5); }
+.services-head h2 { font-size: 26px; }
+.services-head p { display: none; }
+
+.services-grid { display: grid; gap: 12px; }
+
+.svc-card {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  overflow: hidden;
+  color: inherit;
+  transition: box-shadow var(--transition), transform var(--transition), border-color var(--transition);
+}
+.svc-card:hover { box-shadow: var(--sh-md); border-color: var(--blue-100); }
+
+.svc-media { position: relative; flex: none; width: 88px; height: 70px; }
+.svc-media img { width: 100%; height: 100%; object-fit: cover; }
+.svc-icon { display: none; }
+
+.svc-body { flex: 1 1 auto; min-width: 0; padding: 6px 0; }
+.svc-body h3 { font-size: 15px; font-weight: 700; color: var(--ink-900); line-height: 1.32; }
+.svc-desc, .svc-link { display: none; }
+
+.svc-chevron { width: 20px; height: 20px; flex: none; margin-right: 14px; color: var(--navy-800); }
+
+.services-all { margin-top: var(--sp-5); }
+
+@media (min-width: 992px) {
+  .services-head { text-align: center; margin-bottom: var(--sp-8); }
+  .services-head h2 { font-size: 42px; }
+  .services-head p { display: block; color: var(--ink-500); font-size: 18px; margin-top: var(--sp-3); }
+
+  .services-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 36px; }
+
+  .svc-card {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0;
+    background: var(--surface-2);
+    border-radius: var(--r-lg);
+    box-shadow: var(--sh-sm);
+  }
+  .svc-card:hover { transform: translateY(-3px); }
+  .svc-media { width: 100%; height: 194px; }
+  .svc-icon {
+    display: flex;
+    position: absolute;
+    top: 16px; left: 16px;
+    width: 56px; height: 56px;
+    border-radius: 14px;
+    background: var(--blue-600);
+    align-items: center; justify-content: center;
+    box-shadow: 0 4px 14px rgba(3, 24, 62, .3);
+  }
+  .svc-icon svg { width: 30px; height: 30px; color: #fff; }
+  .svc-body { padding: 24px 26px 28px; }
+  .svc-body h3 { font-size: 22px; margin-bottom: 12px; }
+  .svc-desc { display: block; color: var(--ink-500); font-size: 16px; line-height: 1.6; margin-bottom: 16px; }
+  .svc-link { display: inline-flex; align-items: center; gap: 8px; color: var(--blue-600); font-weight: 600; font-size: 16px; }
+  .svc-link svg { width: 17px; height: 17px; transition: transform var(--transition); }
+  .svc-card:hover .svc-link svg { transform: translateX(4px); }
+  .svc-chevron { display: none; }
+  .services-all { display: none; }
+}
+
+/* --------------------------------------------------------------------------
+   Phone-only widgets from the mobile PSD: zip check + fleet dashboard preview
+   -------------------------------------------------------------------------- */
+
+.phone-only { display: block; }
+@media (min-width: 992px) { .phone-only { display: none; } }
+
+.widget-card {
+  background: var(--surface);
+  border-radius: var(--r-xl);
+  box-shadow: var(--sh-md);
+  padding: var(--sp-6);
+}
+.widget-card h3 { color: var(--navy-700); font-size: 19px; margin-bottom: var(--sp-4); }
+
+.zip-help {
+  display: flex;
+  align-items: center;
+  gap: 13px;
+  margin-top: var(--sp-5);
+}
+.zip-help i {
+  width: 48px; height: 48px;
+  border-radius: 50%;
+  background: var(--surface-3);
+  display: flex; align-items: center; justify-content: center;
+  flex: none;
+}
+.zip-help i svg { width: 23px; height: 23px; color: var(--blue-600); }
+.zip-help small { display: block; color: var(--ink-500); font-size: 15px; }
+.zip-help a { font-size: 19px; font-weight: 700; }
+
+.mini-kpis { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.mini-kpi {
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  padding: 14px 16px;
+  background: var(--surface-2);
+}
+.mini-kpi span { display: block; font-size: 14px; color: var(--ink-600); font-weight: 600; }
+.mini-kpi strong { display: block; font-size: 30px; color: var(--navy-800); line-height: 1.25; }
+
+/* --------------------------------------------------------------------------
+   "Why Fleets Choose FleetSquad" navy band
+   -------------------------------------------------------------------------- */
+
+.why-band {
+  background: var(--grad-band);
+  border-radius: var(--r-xl);
+  padding: var(--sp-7) var(--sp-6);
+  color: #fff;
+}
+.why-band h2 { color: #fff; font-size: 23px; margin-bottom: var(--sp-6); }
+.why-grid { display: grid; gap: var(--sp-6); }
+.why-item { display: grid; grid-template-columns: auto 1fr; column-gap: 16px; row-gap: 4px; }
+.why-item svg { grid-row: 1 / span 2; width: 38px; height: 38px; color: #fff; align-self: start; }
+.why-item h4 { color: #fff; font-size: 17px; margin: 0; }
+.why-item p { color: rgba(255, 255, 255, .84); font-size: 15px; line-height: 1.5; margin: 0; }
+
+@media (min-width: 992px) {
+  .why-band { border-radius: var(--r-lg); padding: var(--sp-8) var(--sp-9); }
+  .why-band h2 { font-size: 40px; text-align: center; margin-bottom: var(--sp-8); }
+  .why-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--sp-7); }
+  .why-item svg { width: 46px; height: 46px; }
+  .why-item h4 { font-size: 21px; }
+  .why-item p { font-size: 16px; }
+}
+
+/* --------------------------------------------------------------------------
+   "Built FleetSquad Tough" — vehicle types
+   -------------------------------------------------------------------------- */
+
+.vehicles-card {
+  background: var(--surface);
+  border-radius: var(--r-xl);
+  box-shadow: var(--sh-md);
+  padding: var(--sp-7) var(--sp-5) var(--sp-4);
+  text-align: center;
+}
+.vehicles-card h2 { color: var(--navy-700); font-size: 24px; }
+.vehicles-card > p { color: var(--ink-500); font-size: 16px; margin: 10px auto var(--sp-5); max-width: 34ch; }
+
+.vehicles-grid { display: grid; }
+.veh-item {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 10px 0;
+  border-top: 1px solid var(--line-soft);
+  color: inherit;
+  text-align: left;
+}
+.veh-item img { width: 128px; flex: none; }
+.veh-item span { flex: 1 1 auto; font-size: 17px; font-weight: 600; color: var(--ink-600); }
+.veh-item svg { width: 18px; height: 18px; flex: none; color: var(--ink-400); }
+.veh-item:hover span { color: var(--blue-600); }
+
+@media (min-width: 992px) {
+  .vehicles-card { background: none; box-shadow: none; border-radius: 0; padding: 0; }
+  .vehicles-card h2 { font-size: 42px; color: var(--navy-700); }
+  .vehicles-card > p { font-size: 18px; margin-bottom: var(--sp-8); max-width: none; }
+  .vehicles-grid { grid-template-columns: repeat(5, minmax(0, 1fr)); gap: var(--sp-5); }
+  .veh-item { flex-direction: column; gap: 12px; padding: 0; border: 0; text-align: center; }
+  .veh-item img { width: 100%; max-width: 236px; }
+  .veh-item span { flex: none; font-size: 17px; color: var(--ink-800); }
+  .veh-item svg { display: none; }
+}
+
+/* --------------------------------------------------------------------------
+   Closing CTA band
+   -------------------------------------------------------------------------- */
+
+.cta-band {
+  position: relative;
+  overflow: hidden;
+  border-radius: var(--r-xl);
+  background: var(--navy-900);
+  padding: var(--sp-7) var(--sp-6) var(--sp-6);
+  color: #fff;
+}
+.cta-band h2 { color: #fff; font-size: 27px; line-height: 1.25; }
+.cta-band p { color: rgba(255, 255, 255, .86); font-size: 16px; margin: 14px 0 0; max-width: 30ch; }
+.cta-band .btn { margin-top: var(--sp-7); width: 100%; }
+.cta-shield {
+  position: absolute;
+  right: -14px;
+  bottom: 88px;
+  width: 132px;
+  opacity: .95;
+}
+.cta-photo { display: none; }
+
+@media (min-width: 992px) {
+  .cta-band { background: var(--grad-cta); border-radius: var(--r-lg); padding: 0; }
+  .cta-band .cta-inner { position: relative; z-index: 2; max-width: 640px; padding: var(--sp-9) var(--sp-9); }
+  .cta-band h2 { font-size: 38px; }
+  .cta-band p { font-size: 17px; max-width: none; margin-top: 16px; }
+  .cta-band .btn { width: auto; margin-top: var(--sp-6); }
+  .cta-shield { display: none; }
+  .cta-photo {
+    display: block;
+    position: absolute;
+    right: 0; top: 0; bottom: 0;
+    width: 52%;
+  }
+  .cta-photo img { width: 100%; height: 100%; object-fit: cover; object-position: center; }
+  .cta-photo::after {
+    content: "";
+    position: absolute; inset: 0;
+    background: linear-gradient(90deg, #00224a 0%, rgba(0, 34, 74, .55) 34%, rgba(0, 34, 74, 0) 72%);
+  }
+}
+
+/* --------------------------------------------------------------------------
+   Footer
+   -------------------------------------------------------------------------- */
+
+.site-footer { background: var(--navy-900); color: rgba(255, 255, 255, .78); padding-top: var(--sp-9); }
+.footer-grid { display: grid; gap: var(--sp-7); }
+.footer-about p { font-size: 15px; color: rgba(255, 255, 255, .8); line-height: 1.62; margin: var(--sp-4) 0 var(--sp-5); max-width: 34ch; font-weight: 600; }
+.footer-social { display: flex; gap: 14px; }
+.footer-social a {
+  width: 34px; height: 34px;
+  display: flex; align-items: center; justify-content: center;
+  color: #fff;
+}
+.footer-social svg { width: 26px; height: 26px; }
+
+.footer-col h5 { color: #fff; font-size: 18px; margin-bottom: var(--sp-4); }
+.footer-col li + li { margin-top: 12px; }
+.footer-col a { color: rgba(255, 255, 255, .8); font-size: 15px; }
+.footer-col a:hover { color: #fff; }
+
+.footer-contact li { display: flex; align-items: center; gap: 12px; }
+.footer-contact li + li { margin-top: 18px; }
+.footer-contact svg { width: 21px; height: 21px; color: #fff; flex: none; }
+.footer-contact a, .footer-contact span { color: rgba(255, 255, 255, .88); font-size: 15px; }
+
+.footer-bottom {
+  margin-top: var(--sp-8);
+  border-top: 1px solid rgba(255, 255, 255, .12);
+  padding: var(--sp-5) 0;
+}
+.footer-bottom .container {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  align-items: center;
+  text-align: center;
+  font-size: 14px;
+  color: rgba(255, 255, 255, .62);
+  font-weight: 600;
+}
+.footer-bottom a { color: rgba(255, 255, 255, .62); }
+.footer-bottom a:hover { color: #fff; }
+.footer-bottom-links { display: flex; gap: var(--sp-6); }
+
+@media (min-width: 768px) {
+  .footer-grid { grid-template-columns: 1.5fr 1fr 1fr; }
+}
+@media (min-width: 992px) {
+  .footer-grid { grid-template-columns: 1.55fr 1fr 1fr .8fr 1.25fr; gap: var(--sp-6); }
+  .footer-bottom .container { flex-direction: row; justify-content: space-between; text-align: left; }
+}
+
+/* --------------------------------------------------------------------------
+   Inner-page furniture: page hero, breadcrumbs, prose, feature lists
+   -------------------------------------------------------------------------- */
+
+.page-hero {
+  background: var(--grad-hero);
+  color: #fff;
+  padding-block: var(--sp-8) var(--sp-9);
+  position: relative;
+  overflow: hidden;
+}
+.page-hero::after {
+  content: "";
+  position: absolute;
+  right: -120px; top: -120px;
+  width: 420px; height: 420px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(46, 134, 255, .28), transparent 68%);
+}
+.page-hero h1 { color: #fff; max-width: 20ch; }
+.page-hero p { color: rgba(255, 255, 255, .86); font-size: var(--fs-lg); max-width: 62ch; margin-top: var(--sp-4); }
+.page-hero .btn { margin-top: var(--sp-6); }
+.page-hero-inner { position: relative; z-index: 2; }
+
+.crumbs { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; font-size: var(--fs-sm); margin-bottom: var(--sp-4); }
+.crumbs a { color: rgba(255, 255, 255, .72); }
+.crumbs a:hover { color: #fff; }
+.crumbs span { color: rgba(255, 255, 255, .45); }
+.crumbs strong { color: #fff; font-weight: 600; }
+.crumbs--dark a { color: var(--ink-500); }
+.crumbs--dark a:hover { color: var(--blue-600); }
+.crumbs--dark span { color: var(--ink-300); }
+.crumbs--dark strong { color: var(--ink-900); }
+
+.prose { max-width: 74ch; color: var(--ink-600); font-size: var(--fs-lg); line-height: 1.75; }
+.prose h2 { margin: var(--sp-8) 0 var(--sp-4); font-size: 1.75rem; }
+.prose h3 { margin: var(--sp-6) 0 var(--sp-3); }
+.prose ul { margin: 0 0 var(--sp-5); }
+.prose ul li { position: relative; padding-left: 28px; margin-bottom: 10px; }
+.prose ul li::before {
+  content: "";
+  position: absolute;
+  left: 4px; top: 11px;
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  background: var(--blue-600);
+}
+.prose img { border-radius: var(--r-lg); margin-block: var(--sp-6); }
+.prose blockquote {
+  margin: var(--sp-6) 0;
+  padding: var(--sp-5) var(--sp-6);
+  border-left: 4px solid var(--blue-600);
+  background: var(--blue-050);
+  border-radius: 0 var(--r-md) var(--r-md) 0;
+  color: var(--ink-800);
+  font-style: italic;
+}
+
+/* Feature tiles used across the SEO templates */
+.feature {
+  display: flex;
+  gap: 16px;
+  padding: var(--sp-5);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+}
+.feature i {
+  width: 46px; height: 46px;
+  flex: none;
+  border-radius: var(--r-md);
+  background: var(--blue-050);
+  display: flex; align-items: center; justify-content: center;
+}
+.feature i svg { width: 23px; height: 23px; color: var(--blue-600); }
+.feature h4 { margin-bottom: 5px; font-size: var(--fs-md); }
+.feature p { font-size: var(--fs-base); color: var(--ink-500); margin: 0; }
+
+/* Link tiles (service / industry / vehicle indexes) */
+.tile {
+  display: block;
+  padding: var(--sp-6);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  color: inherit;
+  transition: border-color var(--transition), box-shadow var(--transition), transform var(--transition);
+}
+.tile:hover { border-color: var(--blue-100); box-shadow: var(--sh-md); transform: translateY(-2px); }
+.tile h3 { font-size: var(--fs-lg); margin-bottom: 8px; }
+.tile p { font-size: var(--fs-base); color: var(--ink-500); margin: 0 0 var(--sp-4); }
+.tile-link { display: inline-flex; align-items: center; gap: 7px; color: var(--blue-600); font-weight: 600; font-size: var(--fs-base); }
+.tile-link svg { width: 16px; height: 16px; }
+
+/* --------------------------------------------------------------------------
+   Reviews / testimonials
+   -------------------------------------------------------------------------- */
+
+.review-card {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  padding: var(--sp-6);
+  box-shadow: var(--sh-xs);
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+.review-card .stars { margin-bottom: var(--sp-4); }
+.review-card blockquote { margin: 0 0 var(--sp-5); color: var(--ink-700); font-size: var(--fs-md); line-height: 1.65; flex: 1 1 auto; }
+.review-meta { display: flex; align-items: center; gap: 12px; }
+.review-meta strong { display: block; color: var(--ink-900); font-size: var(--fs-base); }
+.review-meta small { color: var(--ink-400); font-size: var(--fs-sm); }
+
+.rating-summary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: var(--sp-7);
+  padding: var(--sp-7);
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+}
+.rating-big { text-align: center; }
+.rating-big strong { display: block; font-size: 3rem; line-height: 1; color: var(--navy-800); font-weight: 800; }
+.rating-big small { color: var(--ink-500); font-size: var(--fs-base); }
+
+/* --------------------------------------------------------------------------
+   Blog
+   -------------------------------------------------------------------------- */
+
+.post-card {
+  display: flex;
+  flex-direction: column;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  overflow: hidden;
+  color: inherit;
+  height: 100%;
+  transition: box-shadow var(--transition), transform var(--transition);
+}
+.post-card:hover { box-shadow: var(--sh-md); transform: translateY(-3px); }
+.post-media { height: 176px; background: var(--grad-hero); position: relative; flex: none; }
+.post-media img { width: 100%; height: 100%; object-fit: cover; }
+.post-cat {
+  position: absolute;
+  top: 14px; left: 14px;
+  padding: 5px 12px;
+  border-radius: var(--r-pill);
+  background: rgba(255, 255, 255, .93);
+  font-size: var(--fs-xs);
+  font-weight: 700;
+  color: var(--navy-800);
+}
+.post-body { padding: var(--sp-5); display: flex; flex-direction: column; flex: 1 1 auto; }
+.post-body h3 { font-size: var(--fs-lg); margin-bottom: 10px; line-height: 1.35; }
+.post-body p { font-size: var(--fs-base); color: var(--ink-500); flex: 1 1 auto; }
+.post-meta { display: flex; align-items: center; gap: 10px; font-size: var(--fs-sm); color: var(--ink-400); margin-top: var(--sp-4); }
+.post-meta i { width: 3px; height: 3px; border-radius: 50%; background: var(--ink-300); }
+
+/* --------------------------------------------------------------------------
+   FAQ accordion
+   -------------------------------------------------------------------------- */
+
+.faq-item { border-bottom: 1px solid var(--line); }
+.faq-q {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-5);
+  width: 100%;
+  padding: var(--sp-5) 0;
+  text-align: left;
+  font-size: var(--fs-lg);
+  font-weight: 700;
+  color: var(--ink-900);
+}
+.faq-q svg { width: 20px; height: 20px; flex: none; color: var(--blue-600); transition: transform var(--transition); }
+.faq-item.is-open .faq-q svg { transform: rotate(45deg); }
+.faq-a { display: none; padding-bottom: var(--sp-5); color: var(--ink-500); max-width: 76ch; }
+.faq-item.is-open .faq-a { display: block; }
+
+/* --------------------------------------------------------------------------
+   Auth screens
+   -------------------------------------------------------------------------- */
+
+.auth-wrap { min-height: 100dvh; display: grid; grid-template-columns: 1fr; background: var(--page); }
+.auth-aside { display: none; }
+.auth-main { display: flex; align-items: center; justify-content: center; padding: var(--sp-7) var(--sp-5); }
+.auth-card { width: 100%; max-width: 428px; }
+
+@media (min-width: 992px) {
+  .auth-wrap { grid-template-columns: 1.05fr 1fr; }
+  .auth-aside {
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    padding: var(--sp-9);
+    background: var(--grad-hero);
+    color: #fff;
+    position: relative;
+    overflow: hidden;
+  }
+  .auth-aside h2 { color: #fff; font-size: 2.4rem; max-width: 15ch; }
+  .auth-aside p { color: rgba(255, 255, 255, .82); font-size: var(--fs-lg); max-width: 46ch; margin-top: var(--sp-4); }
+}
+
+/* Demo-account picker on the login screen */
+.role-pick { display: grid; gap: 10px; }
+.role-pick button {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  border: 1.5px solid var(--line);
+  border-radius: var(--r-md);
+  text-align: left;
+  transition: border-color var(--transition), background var(--transition);
+}
+.role-pick button:hover { border-color: var(--blue-500); background: var(--blue-050); }
+.role-pick button.is-active { border-color: var(--blue-600); background: var(--blue-050); }
+.role-pick strong { display: block; font-size: var(--fs-base); color: var(--ink-900); }
+.role-pick small { color: var(--ink-500); font-size: var(--fs-sm); }
+
+/* --------------------------------------------------------------------------
+   Get Estimate — step panels
+   -------------------------------------------------------------------------- */
+.est-step { display: none; }
+.est-step.is-active { display: block; }
+
+/* --------------------------------------------------------------------------
+   Service card, "full" variant
+   The homepage uses the compact row on phones (per the mobile PSD); index and
+   detail pages always show the full photo card.
+   -------------------------------------------------------------------------- */
+.svc-card--full {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0;
+  background: var(--surface-2);
+  border-radius: var(--r-lg);
+  box-shadow: var(--sh-sm);
+}
+.svc-card--full .svc-media { width: 100%; height: 186px; }
+.svc-card--full .svc-icon {
+  display: flex;
+  position: absolute;
+  top: 14px; left: 14px;
+  width: 50px; height: 50px;
+  border-radius: 13px;
+  background: var(--blue-600);
+  align-items: center; justify-content: center;
+  box-shadow: 0 4px 14px rgba(3, 24, 62, .3);
+}
+.svc-card--full .svc-icon svg { width: 27px; height: 27px; color: #fff; }
+.svc-card--full .svc-body { padding: 22px 24px 26px; }
+.svc-card--full .svc-body h3 { font-size: 20px; margin-bottom: 10px; }
+.svc-card--full .svc-desc { display: block; color: var(--ink-500); font-size: var(--fs-md); line-height: 1.6; margin-bottom: 14px; }
+.svc-card--full .svc-link { display: inline-flex; align-items: center; gap: 8px; color: var(--blue-600); font-weight: 600; }
+.svc-card--full .svc-link svg { width: 17px; height: 17px; transition: transform var(--transition); }
+.svc-card--full:hover .svc-link svg { transform: translateX(4px); }
+.svc-card--full .svc-chevron { display: none; }

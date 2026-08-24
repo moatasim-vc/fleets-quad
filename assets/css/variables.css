@@ -1,0 +1,128 @@
+/* ==========================================================================
+   FleetSquad — Design Tokens
+   Every colour below was sampled directly from the supplied PSD exports so the
+   marketing site and the dashboard share one palette.
+   ========================================================================== */
+
+:root {
+  /* ---------- Brand navy ramp (sampled from hero / footer / dark bands) ---- */
+  --navy-950: #000d20;
+  --navy-900: #001636;   /* footer background                                */
+  --navy-850: #02162d;   /* hero gradient bottom                             */
+  --navy-800: #01224a;   /* stats bar, dark CTA band                         */
+  --navy-700: #023471;   /* "Why Fleets Choose" band                         */
+  --navy-600: #073061;   /* header gradient right                            */
+  --navy-500: #0a4a9e;
+
+  /* ---------- Action blue ------------------------------------------------- */
+  --blue-700: #0b5ed0;
+  --blue-600: #1272f0;   /* primary button / links                           */
+  --blue-500: #2e86ff;
+  --blue-100: #d7e6fd;
+  --blue-050: #eff5fe;
+
+  /* ---------- Neutrals ---------------------------------------------------- */
+  --ink-900: #0b1220;    /* headings                                         */
+  --ink-800: #1d2733;
+  --ink-700: #3f4a5a;
+  --ink-600: #55627a;
+  --ink-500: #6b7890;    /* body copy                                        */
+  --ink-400: #8f9bb0;
+  --ink-300: #b3bdcc;
+  --ink-200: #d8dfe9;
+
+  --line: #e4e9f0;
+  --line-soft: #eef2f7;
+
+  --surface: #ffffff;
+  --surface-2: #f9fafb;  /* card interior on the marketing site              */
+  --surface-3: #f4f6fa;
+  --page: #f2f5f9;       /* dashboard canvas                                 */
+
+  /* ---------- Status palette (order lifecycle) ---------------------------- */
+  --st-open:      #6b7280;   /* Open                       — grey            */
+  --st-assigned:  #16a34a;   /* Assigned                   — green           */
+  --st-waiting:   #2563eb;   /* Completed waiting payment  — blinking blue    */
+  --st-complete:  #1d4ed8;   /* Completed                  — blue            */
+  --st-canceled:  #dc2626;   /* Canceled                   — red             */
+  --st-manager:   #d97706;   /* Needs Manager              — yellow          */
+
+  --ok: #16a34a;
+  --ok-bg: #e8f7ee;
+  --warn: #d97706;
+  --warn-bg: #fdf3e3;
+  --danger: #dc2626;
+  --danger-bg: #fdecec;
+  --info: #2563eb;
+  --info-bg: #e8f0fe;
+
+  /* ---------- Gradients --------------------------------------------------- */
+  --grad-header: linear-gradient(100deg, #042346 0%, #073061 100%);
+  --grad-hero: linear-gradient(157deg, #001225 0%, #01204a 46%, #02305f 100%);
+  --grad-band: linear-gradient(180deg, #012f66 0%, #023471 100%);
+  --grad-cta: linear-gradient(90deg, #00224a 0%, #02316a 100%);
+  --grad-blue: linear-gradient(180deg, #2e86ff 0%, #1272f0 100%);
+
+  /* ---------- Typography -------------------------------------------------- */
+  --font-sans: 'Figtree', 'Mulish', -apple-system, BlinkMacSystemFont,
+               'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  --font-mono: 'SFMono-Regular', ui-monospace, 'Cascadia Mono', Consolas, monospace;
+
+  --fs-xs: 0.75rem;      /* 12 */
+  --fs-sm: 0.8125rem;    /* 13 */
+  --fs-base: 0.9375rem;  /* 15 */
+  --fs-md: 1rem;         /* 16 */
+  --fs-lg: 1.125rem;     /* 18 */
+  --fs-xl: 1.375rem;     /* 22 */
+  --fs-2xl: 1.75rem;     /* 28 */
+  --fs-3xl: 2.25rem;     /* 36 */
+  --fs-4xl: 3rem;        /* 48 */
+
+  /* ---------- Spacing scale ----------------------------------------------- */
+  --sp-1: 4px;
+  --sp-2: 8px;
+  --sp-3: 12px;
+  --sp-4: 16px;
+  --sp-5: 20px;
+  --sp-6: 24px;
+  --sp-7: 32px;
+  --sp-8: 40px;
+  --sp-9: 56px;
+  --sp-10: 72px;
+  --sp-11: 96px;
+
+  /* ---------- Radii ------------------------------------------------------- */
+  --r-xs: 6px;
+  --r-sm: 8px;
+  --r-md: 12px;
+  --r-lg: 16px;
+  --r-xl: 22px;
+  --r-2xl: 32px;
+  --r-pill: 999px;
+
+  /* ---------- Elevation --------------------------------------------------- */
+  --sh-xs: 0 1px 2px rgba(11, 18, 32, .06);
+  --sh-sm: 0 2px 8px rgba(11, 18, 32, .06);
+  --sh-md: 0 6px 20px rgba(11, 18, 32, .08);
+  --sh-lg: 0 16px 40px rgba(11, 18, 32, .12);
+  --sh-blue: 0 8px 22px rgba(18, 114, 240, .28);
+
+  /* ---------- Layout ------------------------------------------------------ */
+  --container: 1240px;
+  --header-h: 76px;
+  --sidebar-w: 256px;
+  --sidebar-w-collapsed: 72px;
+
+  --transition: 180ms cubic-bezier(.4, 0, .2, 1);
+}
+
+/* Respect users who ask for reduced motion — the blinking "waiting payment"
+   badge and all transitions flatten out. */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: .001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: .001ms !important;
+    scroll-behavior: auto !important;
+  }
+}

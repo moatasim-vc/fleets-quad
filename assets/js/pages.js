@@ -1,0 +1,703 @@
+/* ==========================================================================
+   FleetSquad — Public page renderer
+   One module drives every templated marketing page. The page announces itself
+   with <body data-page="…"> and, for detail pages, a query-string slug.
+   ========================================================================== */
+
+(function (window, document) {
+  'use strict';
+
+  var FS = window.FS;
+  var D = FS.data;
+  var Store = FS.store;
+  var C = D.company;
+
+  var body = document.getElementById('pageBody');
+
+  /* ------------------------------------------------------------------------
+     Shared blocks
+     ------------------------------------------------------------------------ */
+
+  function section(inner, cls, style) {
+    return '<section class="section ' + (cls || '') + '"' + (style ? ' style="' + style + '"' : '') + '>' +
+      '<div class="container">' + inner + '</div></section>';
+  }
+
+  function headBlock(title, lead, left) {
+    return '<div class="section-head' + (left ? ' section-head--left' : '') + '">' +
+      '<h2>' + FS.esc(title) + '</h2>' +
+      (lead ? '<p>' + FS.esc(lead) + '</p>' : '') + '</div>';
+  }
+
+  /** Closing call-to-action + contact strip shared by every SEO template. */
+  function ctaBlock() {
+    return '<section class="section" style="padding-top:0"><div class="container">' +
+      '<div class="cta-band">' +
+        '<div class="cta-inner">' +
+          '<h2>Ready to put a tech on your fleet?</h2>' +
+          '<p>Book service today and keep your fleet mission-ready. Free estimate, no obligation.</p>' +
+          '<div class="row row-wrap" style="gap:var(--sp-3);margin-top:var(--sp-6)">' +
+            '<a class="btn btn-primary" href="' + FS.url('get-estimate.html') + '">Get Estimate</a>' +
+            '<a class="btn btn-outline-light" href="tel:' + C.phoneRaw + '">' + FS.icon('phone') + C.phone + '</a>' +
+          '</div>' +
+        '</div>' +
+        '<div class="cta-photo"><img src="' + FS.url('assets/img/cta-van.jpg') + '" alt="" loading="lazy"></div>' +
+      '</div>' +
+    '</div></section>';
+  }
+
+  function contactBlock() {
+    return section(
+      '<div class="grid grid-3">' +
+        contactCard('phone-ring', 'Call dispatch', C.phone, 'tel:' + C.phoneRaw, C.hours) +
+        contactCard('mail', 'Email us', C.email, 'mailto:' + C.email, 'We reply within one business hour') +
+        contactCard('globe', 'Coverage', C.network, FS.url('pages/service-areas.html'), '16 states · 80+ metro areas') +
+      '</div>', '', 'padding-top:0');
+  }
+
+  function contactCard(icon, label, value, href, sub) {
+    return '<a class="feature card-hover" href="' + href + '">' +
+      '<i>' + FS.icon(icon) + '</i>' +
+      '<div><h4>' + FS.esc(label) + '</h4>' +
+        '<p class="text-blue text-bold">' + FS.esc(value) + '</p>' +
+        '<p class="text-xs text-dim mt-2">' + FS.esc(sub) + '</p></div>' +
+    '</a>';
+  }
+
+  function featureGrid(features) {
+    return '<div class="grid grid-4">' + features.map(function (f) {
+      return '<div class="feature"><i>' + FS.icon(f.icon) + '</i>' +
+        '<div><h4>' + FS.esc(f.title) + '</h4><p>' + FS.esc(f.text) + '</p></div></div>';
+    }).join('') + '</div>';
+  }
+
+  function bulletList(items) {
+    return '<div class="prose"><ul>' + items.map(function (b) {
+      return '<li>' + FS.esc(b) + '</li>';
+    }).join('') + '</ul></div>';
+  }
+
+  function setHero(title, lead, crumbs, extra) {
+    document.getElementById('pageTitle').innerHTML = FS.esc(title);
+    document.getElementById('pageLead').innerHTML = FS.esc(lead);
+    document.title = title + ' | FleetSquad';
+    var meta = document.querySelector('meta[name="description"]');
+    if (meta) meta.setAttribute('content', lead);
+
+    var host = document.getElementById('crumbs');
+    if (host) {
+      host.innerHTML = crumbs.map(function (c, i) {
+        var sep = i ? '<span>/</span>' : '';
+        return sep + (c.href ? '<a href="' + FS.url(c.href) + '">' + FS.esc(c.label) + '</a>'
+                             : '<strong>' + FS.esc(c.label) + '</strong>');
+      }).join('');
+    }
+    if (extra) document.getElementById('pageHeroExtra').innerHTML = extra;
+  }
+
+  /** Shown when a slug does not resolve. */
+  function notFound(kind, backHref, backLabel) {
+    setHero('Page not found', 'We could not find that ' + kind + '.', [{ label: 'Home', href: 'index.html' }, { label: 'Not found' }]);
+    body.innerHTML = section(
+      '<div class="empty-state">' + FS.icon('help-circle') +
+      '<h4>Nothing here</h4><p>The ' + kind + ' you asked for does not exist. Browse the full list instead.</p>' +
+      '<a class="btn btn-primary mt-6" href="' + FS.url(backHref) + '">' + backLabel + '</a></div>');
+  }
+
+  /* ======================================================================
+     Services
+     ====================================================================== */
+
+  function servicesIndex() {
+    body.innerHTML =
+      section('<div class="grid grid-3">' + D.services.map(function (s) {
+        return '<a class="svc-card" href="' + FS.url('service.html?s=' + s.slug) + '">' +
+          '<div class="svc-media">' +
+            '<img src="' + FS.url(s.image) + '" alt="' + FS.esc(s.name) + '" loading="lazy">' +
+            '<span class="svc-icon">' + FS.icon(s.icon) + '</span>' +
+          '</div>' +
+          '<div class="svc-body"><h3>' + FS.esc(s.name) + '</h3>' +
+            '<p class="svc-desc">' + FS.esc(s.excerpt) + '</p>' +
+            '<span class="svc-link">Learn More' + FS.icon('arrow-right') + '</span></div>' +
+          FS.icon('chevron-right', 'svc-chevron') +
+        '</a>';
+      }).join('') + '</div>') +
+      ctaBlock() + contactBlock();
+    // Force the desktop card treatment on the index even on narrow screens.
+    FS.$$('.svc-card', body).forEach(function (c) { c.classList.add('svc-card--full'); });
+  }
+
+  function serviceDetail() {
+    var s = D.services.filter(function (x) { return x.slug === FS.param('s'); })[0];
+    if (!s) return notFound('service', 'services.html', 'All services');
+
+    setHero(s.hero, s.intro.split('. ')[0] + '.',
+      [{ label: 'Home', href: 'index.html' }, { label: 'Services', href: 'services.html' }, { label: s.short }],
+      '<a class="btn btn-primary" href="' + FS.url('get-estimate.html') + '">Get Estimate</a>');
+
+    body.innerHTML =
+      section(
+        '<div class="split split--2-1" style="gap:var(--sp-8)">' +
+          '<div>' +
+            '<h2 class="mb-4">' + FS.esc(s.name) + '</h2>' +
+            '<p class="prose mb-6">' + FS.esc(s.intro) + '</p>' +
+            '<h3 class="mb-3">What is included</h3>' +
+            bulletList(s.bullets) +
+          '</div>' +
+          '<div>' +
+            '<img src="' + FS.url(s.image) + '" alt="' + FS.esc(s.name) + '" style="border-radius:var(--r-lg);width:100%">' +
+            '<div class="card mt-5"><div class="card-body">' +
+              '<h4 class="mb-3">Book this service</h4>' +
+              '<p class="text-muted text-sm mb-5">Tell us how many vehicles and where they are. We handle the rest.</p>' +
+              '<a class="btn btn-primary btn-block mb-3" href="' + FS.url('get-estimate.html') + '">Get Estimate</a>' +
+              '<a class="btn btn-outline btn-block" href="tel:' + C.phoneRaw + '">' + FS.icon('phone') + C.phone + '</a>' +
+            '</div></div>' +
+          '</div>' +
+        '</div>') +
+
+      section(headBlock('Why fleets book ' + s.short, 'What you get on every visit.') + featureGrid(s.features), '', 'padding-top:0;background:var(--surface-2)') +
+
+      section(headBlock('Vehicles we service', 'Class 1 through Class 8 — all makes and models.') +
+        '<div class="vehicles-grid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:var(--sp-5)">' +
+        D.vehicleTypes.map(function (v) {
+          return '<a class="veh-item" href="' + FS.url('vehicle.html?v=' + v.slug) + '" style="flex-direction:column;text-align:center;border:0">' +
+            '<img src="' + FS.url(v.image) + '" alt="' + FS.esc(v.name) + '" loading="lazy">' +
+            '<span>' + FS.esc(v.name) + '</span></a>';
+        }).join('') + '</div>', '', 'padding-top:0') +
+
+      ctaBlock() + contactBlock();
+  }
+
+  /* ======================================================================
+     Industries
+     ====================================================================== */
+
+  function industriesIndex() {
+    body.innerHTML =
+      section('<div class="grid grid-3">' + D.industries.map(function (i) {
+        return '<a class="tile" href="' + FS.url('industry.html?i=' + i.slug) + '">' +
+          '<span class="kpi-icon kpi-icon--navy mb-3">' + FS.icon(i.icon) + '</span>' +
+          '<h3>' + FS.esc(i.name) + '</h3><p>' + FS.esc(i.excerpt) + '</p>' +
+          '<span class="tile-link">Explore' + FS.icon('arrow-right') + '</span></a>';
+      }).join('') + '</div>') + ctaBlock() + contactBlock();
+  }
+
+  function industryDetail() {
+    var i = D.industries.filter(function (x) { return x.slug === FS.param('i'); })[0];
+    if (!i) return notFound('industry', 'industries.html', 'All industries');
+
+    setHero(i.hero, i.intro,
+      [{ label: 'Home', href: 'index.html' }, { label: 'Industries', href: 'industries.html' }, { label: i.name }],
+      '<a class="btn btn-primary" href="' + FS.url('get-estimate.html') + '">Get Estimate</a>');
+
+    body.innerHTML =
+      section('<div class="grid grid-3">' + i.stats.map(function (s) {
+        return '<div class="kpi text-center"><div class="kpi-value" style="font-size:2.2rem">' + FS.esc(s.v) + '</div>' +
+          '<div class="kpi-label mt-2">' + FS.esc(s.l) + '</div></div>';
+      }).join('') + '</div>') +
+
+      section(
+        '<div class="split split--2-1" style="gap:var(--sp-8)">' +
+          '<div><h2 class="mb-4">How we work with ' + FS.esc(i.name.toLowerCase()) + '</h2>' +
+          '<p class="prose mb-6">' + FS.esc(i.intro) + '</p>' + bulletList(i.bullets) + '</div>' +
+          '<div class="card"><div class="card-body">' +
+            '<h4 class="mb-4">Popular services</h4>' +
+            D.services.slice(0, 5).map(function (s) {
+              return '<a class="row-between" href="' + FS.url('service.html?s=' + s.slug) + '" ' +
+                'style="padding:11px 0;border-bottom:1px solid var(--line-soft);color:var(--ink-700)">' +
+                '<span class="text-semi">' + FS.esc(s.short) + '</span>' + FS.icon('chevron-right') + '</a>';
+            }).join('') +
+            '<a class="btn btn-primary btn-block mt-5" href="' + FS.url('get-estimate.html') + '">Get Estimate</a>' +
+          '</div></div>' +
+        '</div>', '', 'padding-top:0') +
+
+      section(headBlock('Why fleets choose FleetSquad') + featureGrid(D.whyPoints.map(function (w) {
+        return { icon: w.icon, title: w.title, text: w.text };
+      })), '', 'padding-top:0;background:var(--surface-2)') +
+
+      ctaBlock() + contactBlock();
+  }
+
+  /* ======================================================================
+     Vehicle types
+     ====================================================================== */
+
+  function vehiclesIndex() {
+    body.innerHTML =
+      section('<div class="grid grid-3">' + D.vehicleTypes.map(function (v) {
+        return '<a class="tile text-center" href="' + FS.url('vehicle.html?v=' + v.slug) + '">' +
+          '<img src="' + FS.url(v.image) + '" alt="' + FS.esc(v.name) + '" style="margin:0 auto var(--sp-4);max-width:260px" loading="lazy">' +
+          '<h3>' + FS.esc(v.name) + '</h3><p>' + FS.esc(v.excerpt) + '</p>' +
+          '<span class="tile-link" style="justify-content:center">View maintenance' + FS.icon('arrow-right') + '</span></a>';
+      }).join('') + '</div>') + ctaBlock() + contactBlock();
+  }
+
+  function vehicleDetail() {
+    var v = D.vehicleTypes.filter(function (x) { return x.slug === FS.param('v'); })[0];
+    if (!v) return notFound('vehicle type', 'vehicles.html', 'All vehicle types');
+
+    setHero(v.hero, v.intro,
+      [{ label: 'Home', href: 'index.html' }, { label: 'Vehicles', href: 'vehicles.html' }, { label: v.name }],
+      '<a class="btn btn-primary" href="' + FS.url('get-estimate.html') + '">Get Estimate</a>');
+
+    body.innerHTML =
+      section(
+        '<div class="split split--1-1" style="gap:var(--sp-8);align-items:center">' +
+          '<img src="' + FS.url(v.image) + '" alt="' + FS.esc(v.name) + '" style="width:100%">' +
+          '<div><h2 class="mb-4">' + FS.esc(v.hero) + '</h2>' +
+          '<p class="prose mb-6">' + FS.esc(v.intro) + '</p>' + bulletList(v.bullets) + '</div>' +
+        '</div>') +
+
+      section(headBlock('Services for ' + v.name.toLowerCase()) +
+        '<div class="grid grid-3">' + D.services.slice(0, 6).map(function (s) {
+          return '<a class="tile" href="' + FS.url('service.html?s=' + s.slug) + '">' +
+            '<span class="kpi-icon mb-3">' + FS.icon(s.icon) + '</span>' +
+            '<h3>' + FS.esc(s.short) + '</h3><p>' + FS.esc(s.excerpt) + '</p>' +
+            '<span class="tile-link">Learn more' + FS.icon('arrow-right') + '</span></a>';
+        }).join('') + '</div>', '', 'padding-top:0;background:var(--surface-2)') +
+
+      ctaBlock() + contactBlock();
+  }
+
+  /* ======================================================================
+     Blog
+     ====================================================================== */
+
+  function blogList() {
+    var active = FS.param('cat', 'All');
+    var posts = D.posts.slice().sort(function (a, b) { return new Date(b.at) - new Date(a.at); });
+    var shown = active === 'All' ? posts : posts.filter(function (p) { return p.category === active; });
+
+    var cats = ['All'].concat(D.postCategories).map(function (c) {
+      return '<a class="filter-pill' + (c === active ? ' is-active' : '') + '" href="' +
+        FS.url('blog.html' + (c === 'All' ? '' : '?cat=' + encodeURIComponent(c))) + '">' + FS.esc(c) + '</a>';
+    }).join('');
+
+    body.innerHTML = section(
+      '<div class="filters mb-8">' + cats + '</div>' +
+      (shown.length
+        ? '<div class="grid grid-3">' + shown.map(postCard).join('') + '</div>'
+        : '<div class="empty-state">' + FS.icon('file-text') + '<h4>No posts yet</h4><p>Nothing published in this category.</p></div>')
+    ) + ctaBlock();
+  }
+
+  function postCard(p) {
+    return '<a class="post-card" href="' + FS.url('blog-post.html?p=' + p.slug) + '">' +
+      '<div class="post-media"><img src="' + FS.url(p.image) + '" alt="" loading="lazy">' +
+      '<span class="post-cat">' + FS.esc(p.category) + '</span></div>' +
+      '<div class="post-body"><h3>' + FS.esc(p.title) + '</h3><p>' + FS.esc(p.excerpt) + '</p>' +
+      '<div class="post-meta"><span>' + FS.date(p.at) + '</span><i></i><span>' + p.read + ' min read</span></div></div></a>';
+  }
+
+  function blogPost() {
+    var p = D.posts.filter(function (x) { return x.slug === FS.param('p'); })[0];
+    if (!p) return notFound('article', 'blog.html', 'All posts');
+
+    setHero(p.title, p.excerpt,
+      [{ label: 'Home', href: 'index.html' }, { label: 'Blog', href: 'blog.html' }, { label: p.category }],
+      '<div class="row row-wrap mt-6" style="gap:var(--sp-5);color:rgba(255,255,255,.8);font-size:var(--fs-sm)">' +
+        '<span class="row" style="gap:8px">' + FS.icon('user') + FS.esc(p.author) + '</span>' +
+        '<span class="row" style="gap:8px">' + FS.icon('calendar') + FS.date(p.at, 'long') + '</span>' +
+        '<span class="row" style="gap:8px">' + FS.icon('clock') + p.read + ' min read</span>' +
+      '</div>');
+
+    var related = D.posts.filter(function (x) { return x.slug !== p.slug; }).slice(0, 3);
+
+    body.innerHTML =
+      section(
+        '<div class="split split--2-1" style="gap:var(--sp-8)">' +
+          '<article>' +
+            '<img src="' + FS.url(p.image) + '" alt="" style="border-radius:var(--r-lg);width:100%;margin-bottom:var(--sp-7)">' +
+            '<div class="prose">' + p.body.map(function (para) { return '<p>' + FS.esc(para) + '</p>'; }).join('') + '</div>' +
+            '<div class="divider"></div>' +
+            '<div class="row row-wrap" style="gap:var(--sp-3)">' +
+              '<span class="chip">' + FS.esc(p.category) + '</span>' +
+              '<span class="chip">Fleet Maintenance</span><span class="chip">Uptime</span>' +
+            '</div>' +
+          '</article>' +
+          '<aside>' +
+            '<div class="card mb-5"><div class="card-body">' +
+              '<h4 class="mb-3">Article details</h4>' +
+              '<dl class="dl">' +
+                '<div><dt>Author</dt><dd>' + FS.esc(p.author) + '</dd></div>' +
+                '<div><dt>Published</dt><dd>' + FS.date(p.at, 'long') + '</dd></div>' +
+                '<div><dt>Category</dt><dd>' + FS.esc(p.category) + '</dd></div>' +
+                '<div><dt>Reading time</dt><dd>' + p.read + ' minutes</dd></div>' +
+              '</dl>' +
+            '</div></div>' +
+            '<div class="card"><div class="card-body">' +
+              '<h4 class="mb-3">Need a hand with your fleet?</h4>' +
+              '<p class="text-muted text-sm mb-5">Free estimate, no obligation. We come to you.</p>' +
+              '<a class="btn btn-primary btn-block" href="' + FS.url('get-estimate.html') + '">Get Estimate</a>' +
+            '</div></div>' +
+          '</aside>' +
+        '</div>') +
+
+      section(headBlock('Keep reading') + '<div class="grid grid-3">' + related.map(postCard).join('') + '</div>',
+        '', 'padding-top:0;background:var(--surface-2)') +
+      ctaBlock();
+  }
+
+  /* ======================================================================
+     Reviews
+     ====================================================================== */
+
+  function reviewsPage() {
+    var rs = Store.reviewStats();
+    var order = FS.param('sort', 'newest');
+    var list = Store.reviews('published');
+    if (order === 'oldest') list = list.slice().reverse();
+    if (order === 'highest') list = list.slice().sort(function (a, b) { return b.rating - a.rating; });
+
+    body.innerHTML = section(
+      '<div class="rating-summary mb-8">' +
+        '<div class="rating-big"><strong>' + rs.average.toFixed(1) + '</strong>' +
+          FS.stars(rs.average, 'stars--lg') +
+          '<small>Based on ' + FS.num(rs.count) + ' verified reviews</small></div>' +
+        '<div class="stack" style="gap:7px;flex:1 1 300px;max-width:420px;color:#f5a524">' +
+          [5, 4, 3, 2, 1].map(function (star) {
+            var n = rs.breakdown[star - 1] || 0;
+            var pct = rs.count ? Math.round((n / rs.count) * 100) : 0;
+            return '<div class="row" style="gap:10px"><span class="text-sm text-muted" style="width:12px">' + star + '</span>' +
+              '<span class="stars">' + FS.icon('star') + '</span>' +
+              '<span class="progress" style="flex:1 1 auto"><span style="width:' + pct + '%"></span></span>' +
+              '<span class="text-xs text-dim" style="width:28px;text-align:right">' + n + '</span></div>';
+          }).join('') +
+        '</div>' +
+      '</div>' +
+
+      '<div class="row-between row-wrap mb-6">' +
+        '<div class="filters">' +
+          ['newest', 'oldest', 'highest'].map(function (o) {
+            return '<a class="filter-pill' + (o === order ? ' is-active' : '') + '" href="' +
+              FS.url('reviews.html?sort=' + o) + '">' +
+              ({ newest: 'Newest first', oldest: 'Oldest first', highest: 'Highest rated' })[o] + '</a>';
+          }).join('') +
+        '</div>' +
+        '<button class="btn btn-primary" id="writeReview">' + FS.icon('edit') + 'Write a review</button>' +
+      '</div>' +
+
+      '<div class="grid grid-3" id="reviewList">' + list.map(function (r) {
+        return '<article class="review-card">' + FS.stars(r.rating) +
+          '<h4 class="mb-3">' + FS.esc(r.title) + '</h4>' +
+          '<blockquote>' + FS.esc(r.body) + '</blockquote>' +
+          '<div class="review-meta"><span class="avatar">' + FS.initials(r.name) + '</span>' +
+          '<div><strong>' + FS.esc(r.name) + '</strong><small>' + FS.esc(r.company) + ' · ' + FS.date(r.at) + '</small></div></div>' +
+        '</article>';
+      }).join('') + '</div>'
+    ) + ctaBlock();
+
+    document.getElementById('writeReview').addEventListener('click', openReviewModal);
+  }
+
+  /** Review submission modal — reused by the customer portal. */
+  function openReviewModal() {
+    FS.modal({
+      title: 'Write a review',
+      subtitle: 'Tell other fleet operators how the service went.',
+      body:
+        '<form id="reviewForm" novalidate>' +
+          '<div class="field"><span class="label">Your rating <span class="req">*</span></span>' +
+            FS.starInput(0) + '<p class="error-text hidden" id="rateErr">Please choose a rating.</p></div>' +
+          '<div class="field-row field-row-2 mb-4">' +
+            '<div class="field"><label class="label" for="rvName">Your name <span class="req">*</span></label>' +
+              '<input class="input" id="rvName" name="name" required></div>' +
+            '<div class="field"><label class="label" for="rvCompany">Company <span class="req">*</span></label>' +
+              '<input class="input" id="rvCompany" name="company" required></div>' +
+          '</div>' +
+          '<div class="field"><label class="label" for="rvTitle">Headline <span class="req">*</span></label>' +
+            '<input class="input" id="rvTitle" name="title" placeholder="Saved us two full days of downtime" required></div>' +
+          '<div class="field"><label class="label" for="rvBody">Your review <span class="req">*</span></label>' +
+            '<textarea class="textarea" id="rvBody" name="body" required></textarea></div>' +
+        '</form>',
+      footer: '<button class="btn btn-outline" data-close>Cancel</button>' +
+              '<button class="btn btn-primary" id="rvSubmit">Submit review</button>',
+      onMount: function (root, close) {
+        root.querySelector('#rvSubmit').addEventListener('click', function () {
+          var form = root.querySelector('#reviewForm');
+          var rating = Number(root.querySelector('.star-input').dataset.value || 0);
+          root.querySelector('#rateErr').classList.toggle('hidden', rating > 0);
+          if (!FS.validate(form) || !rating) return;
+          var f = FS.formData(form);
+          Store.addReview({
+            customerId: null, orderId: null,
+            name: f.name, company: f.company,
+            rating: rating, title: f.title, body: f.body
+          });
+          close();
+          FS.toast('Thank you', 'Your review is pending moderation.', 'ok');
+        });
+      }
+    });
+  }
+  FS.openReviewModal = openReviewModal;
+
+  /* ======================================================================
+     CMS pages
+     ====================================================================== */
+
+  function aboutPage() {
+    body.innerHTML =
+      section(
+        '<div class="split split--2-1" style="gap:var(--sp-8)">' +
+          '<div class="prose">' +
+            '<p>FleetSquad exists because of a simple observation: a vehicle that has to be driven to maintenance is a vehicle that is already costing you money. Every mile to a shop, every hour in a waiting bay and every rental replacement is time your fleet is not earning.</p>' +
+            '<p>We started in 2016 with one ASE Master Technician and one service van. Today we run a nationwide network of mobile technicians, a 24-7 dispatch desk and a platform that keeps every inspection, photograph and invoice attached to the vehicle it belongs to.</p>' +
+            '<h2>What we believe</h2>' +
+            '<p>Maintenance should be scheduled, documented and invisible to the people who depend on the vehicle. Our job is to make the fleet manager\'s week quieter, not busier.</p>' +
+            '<blockquote>The hundred-thousandth work order closed on a box truck in Newark, at 4:40am, in the rain. That is the job.</blockquote>' +
+          '</div>' +
+          '<div class="card"><div class="card-body">' +
+            '<h4 class="mb-4">FleetSquad by the numbers</h4>' +
+            D.stats.map(function (s) {
+              return '<div class="money-row"><span>' + FS.esc(s.label) + '</span>' +
+                '<strong>' + (s.decimal ? s.value : FS.num(s.value)) + s.suffix + '</strong></div>';
+            }).join('') +
+            '<a class="btn btn-primary btn-block mt-5" href="' + FS.url('get-estimate.html') + '">Get Estimate</a>' +
+          '</div></div>' +
+        '</div>') +
+
+      section(headBlock('How we got here') +
+        '<div class="grid grid-4">' + D.timelineValues.map(function (t) {
+          return '<div class="card card-pad">' +
+            '<span class="chip chip--active mb-3">' + t.year + '</span>' +
+            '<h4 class="mb-2">' + FS.esc(t.title) + '</h4>' +
+            '<p class="text-muted text-sm">' + FS.esc(t.text) + '</p></div>';
+        }).join('') + '</div>', '', 'padding-top:0;background:var(--surface-2)') +
+
+      section(headBlock('Why fleets choose FleetSquad') + featureGrid(D.whyPoints), '', 'padding-top:0') +
+      ctaBlock() + contactBlock();
+  }
+
+  function partnersPage() {
+    body.innerHTML =
+      section('<div class="grid grid-3">' + D.partners.map(function (p) {
+        return '<div class="card card-pad text-center">' +
+          '<img src="' + FS.url(p.logo) + '" alt="' + FS.esc(p.name) + '" style="height:56px;width:auto;margin:0 auto var(--sp-5);filter:grayscale(1)" loading="lazy">' +
+          '<span class="chip mb-3">' + FS.esc(p.type) + '</span>' +
+          '<h3 class="mb-2">' + FS.esc(p.name) + '</h3>' +
+          '<p class="text-muted text-sm">' + FS.esc(p.text) + '</p></div>';
+      }).join('') + '</div>') +
+
+      section(headBlock('Partner with FleetSquad', 'Running a network that needs consistent mobile maintenance across multiple markets? Let us talk.') +
+        '<div class="text-center"><a class="btn btn-primary btn-lg" href="' + FS.url('pages/contact.html') + '">Talk to partnerships</a></div>',
+        '', 'padding-top:0;background:var(--surface-2)') +
+      ctaBlock();
+  }
+
+  function careersPage() {
+    body.innerHTML =
+      section(headBlock('Open roles', D.jobs.length + ' positions across our field, dispatch and operations teams.') +
+        '<div class="stack">' + D.jobs.map(function (j) {
+          return '<div class="card card-pad">' +
+            '<div class="row-between row-wrap" style="gap:var(--sp-4)">' +
+              '<div style="flex:1 1 320px;min-width:0">' +
+                '<h3 class="mb-2">' + FS.esc(j.title) + '</h3>' +
+                '<div class="row row-wrap mb-3" style="gap:8px">' +
+                  '<span class="chip">' + FS.icon('briefcase') + FS.esc(j.dept) + '</span>' +
+                  '<span class="chip">' + FS.icon('map-pin') + FS.esc(j.location) + '</span>' +
+                  '<span class="chip chip--active">' + FS.esc(j.type) + '</span>' +
+                '</div>' +
+                '<p class="text-muted text-sm mb-0">' + FS.esc(j.text) + '</p>' +
+              '</div>' +
+              '<button class="btn btn-primary" data-apply="' + FS.esc(j.title) + '">Apply now</button>' +
+            '</div></div>';
+        }).join('') + '</div>') +
+
+      section(headBlock('What we offer') + featureGrid([
+        { icon: 'wallet', title: 'Competitive pay', text: 'Above-market hourly rates plus completion bonuses.' },
+        { icon: 'truck', title: 'Your own unit', text: 'A fully equipped service van and tool package.' },
+        { icon: 'calendar', title: 'Real schedules', text: 'Predictable routes, no unpaid on-call weeks.' },
+        { icon: 'sparkles', title: 'Paid certification', text: 'We fund ASE certification and recertification.' }
+      ]), '', 'padding-top:0;background:var(--surface-2)') +
+      ctaBlock();
+
+    body.addEventListener('click', function (e) {
+      var btn = e.target.closest('[data-apply]');
+      if (!btn) return;
+      FS.modal({
+        title: 'Apply: ' + btn.dataset.apply,
+        subtitle: 'We reply to every application within five business days.',
+        body:
+          '<form id="applyForm" novalidate>' +
+            '<div class="field-row field-row-2 mb-4">' +
+              '<div class="field"><label class="label" for="apName">Full name <span class="req">*</span></label><input class="input" id="apName" name="name" required></div>' +
+              '<div class="field"><label class="label" for="apPhone">Phone <span class="req">*</span></label><input class="input" id="apPhone" name="phone" required></div>' +
+            '</div>' +
+            '<div class="field"><label class="label" for="apEmail">Email <span class="req">*</span></label><input class="input" id="apEmail" name="email" type="email" required></div>' +
+            '<div class="field"><label class="label" for="apCerts">Certifications</label><input class="input" id="apCerts" name="certs" placeholder="ASE Master, Diesel, HVAC…"></div>' +
+            '<div class="field"><label class="label" for="apWhy">Why FleetSquad?</label><textarea class="textarea" id="apWhy" name="why"></textarea></div>' +
+          '</form>',
+        footer: '<button class="btn btn-outline" data-close>Cancel</button><button class="btn btn-primary" id="apSend">Send application</button>',
+        onMount: function (root, close) {
+          root.querySelector('#apSend').addEventListener('click', function () {
+            if (!FS.validate(root.querySelector('#applyForm'))) return;
+            close();
+            FS.toast('Application sent', 'Our recruiting team will be in touch.', 'ok');
+          });
+        }
+      });
+    });
+  }
+
+  function contactPage() {
+    body.innerHTML =
+      section(
+        '<div class="split split--2-1" style="gap:var(--sp-8)">' +
+          '<div class="card"><div class="card-body">' +
+            '<h2 class="mb-2" style="font-size:var(--fs-xl)">Send us a message</h2>' +
+            '<p class="text-muted mb-6">A coordinator replies within one business hour.</p>' +
+            '<form id="contactForm" novalidate>' +
+              '<div class="field-row field-row-2 mb-4">' +
+                '<div class="field"><label class="label" for="cName">Name <span class="req">*</span></label><input class="input" id="cName" name="name" required></div>' +
+                '<div class="field"><label class="label" for="cCompany">Company <span class="req">*</span></label><input class="input" id="cCompany" name="company" required></div>' +
+              '</div>' +
+              '<div class="field-row field-row-2 mb-4">' +
+                '<div class="field"><label class="label" for="cEmail">Email <span class="req">*</span></label><input class="input" id="cEmail" name="email" type="email" required></div>' +
+                '<div class="field"><label class="label" for="cPhone">Phone <span class="req">*</span></label><input class="input" id="cPhone" name="phone" type="tel" required></div>' +
+              '</div>' +
+              '<div class="field"><label class="label" for="cTopic">Topic</label>' +
+                '<select class="select" id="cTopic" name="topic">' +
+                  '<option>New fleet enquiry</option><option>Existing project</option>' +
+                  '<option>Billing</option><option>Partnerships</option><option>Careers</option>' +
+                '</select></div>' +
+              '<div class="field"><label class="label" for="cMsg">Message <span class="req">*</span></label>' +
+                '<textarea class="textarea" id="cMsg" name="message" required></textarea></div>' +
+              '<button class="btn btn-primary btn-block" type="submit">Send message' + FS.icon('send') + '</button>' +
+            '</form>' +
+          '</div></div>' +
+          '<div class="stack">' +
+            contactCard('phone-ring', 'Call dispatch', C.phone, 'tel:' + C.phoneRaw, C.hours) +
+            contactCard('mail', 'Email support', C.email, 'mailto:' + C.email, 'Replies within one business hour') +
+            contactCard('map', 'Service areas', '16 states', FS.url('pages/service-areas.html'), '80+ metro areas covered') +
+            '<div class="card card-pad">' +
+              '<h4 class="mb-3">Emergency roadside</h4>' +
+              '<p class="text-muted text-sm mb-4">Vehicle down right now? Call the 24-7 line — a live dispatcher answers.</p>' +
+              '<a class="btn btn-danger btn-block" href="tel:' + C.phoneRaw + '">' + FS.icon('phone') + 'Call 24-7 dispatch</a>' +
+            '</div>' +
+          '</div>' +
+        '</div>') + ctaBlock();
+
+    document.getElementById('contactForm').addEventListener('submit', function (e) {
+      e.preventDefault();
+      if (!FS.validate(e.target)) return;
+      e.target.reset();
+      FS.toast('Message sent', 'A FleetSquad coordinator will reply shortly.', 'ok');
+    });
+  }
+
+  function faqsPage() {
+    body.innerHTML =
+      section(
+        '<div style="max-width:820px;margin-inline:auto">' +
+          D.faqs.map(function (f, i) {
+            return '<div class="faq-item' + (i === 0 ? ' is-open' : '') + '">' +
+              '<button class="faq-q" data-accordion aria-expanded="' + (i === 0) + '">' +
+                FS.esc(f.q) + FS.icon('plus') + '</button>' +
+              '<div class="faq-a">' + FS.esc(f.a) + '</div></div>';
+          }).join('') +
+        '</div>') +
+      section('<div class="card card-pad text-center">' +
+        '<h3 class="mb-2">Still have a question?</h3>' +
+        '<p class="text-muted mb-6">Call dispatch or send us a message — we answer every one.</p>' +
+        '<div class="row row-wrap" style="gap:var(--sp-3);justify-content:center">' +
+          '<a class="btn btn-primary" href="tel:' + C.phoneRaw + '">' + FS.icon('phone') + C.phone + '</a>' +
+          '<a class="btn btn-outline" href="' + FS.url('pages/contact.html') + '">Contact us</a>' +
+        '</div></div>', '', 'padding-top:0') +
+      ctaBlock();
+  }
+
+  function serviceAreasPage() {
+    var total = D.serviceAreas.reduce(function (s, a) { return s + a.cities.length; }, 0);
+    body.innerHTML =
+      section(
+        '<div class="grid grid-3 mb-8">' +
+          '<div class="kpi text-center"><div class="kpi-value" style="font-size:2.2rem">' + D.serviceAreas.length + '</div><div class="kpi-label mt-2">States covered</div></div>' +
+          '<div class="kpi text-center"><div class="kpi-value" style="font-size:2.2rem">' + total + '</div><div class="kpi-label mt-2">Metro areas</div></div>' +
+          '<div class="kpi text-center"><div class="kpi-value" style="font-size:2.2rem">24/7</div><div class="kpi-label mt-2">Dispatch coverage</div></div>' +
+        '</div>' +
+
+        '<div class="field" style="max-width:420px;margin:0 auto var(--sp-8)">' +
+          '<div class="input-icon">' + FS.icon('search') +
+          '<input class="input" id="areaSearch" placeholder="Search by city or state…" aria-label="Search service areas"></div>' +
+        '</div>' +
+
+        '<div class="grid grid-4" id="areaGrid">' + D.serviceAreas.map(function (a) {
+          return '<div class="card card-pad" data-state="' + FS.esc(a.state.toLowerCase()) + '" data-cities="' + FS.esc(a.cities.join(' ').toLowerCase()) + '">' +
+            '<h4 class="mb-3 row" style="gap:8px">' + FS.icon('map-pin') + FS.esc(a.state) + '</h4>' +
+            '<ul>' + a.cities.map(function (c) {
+              return '<li class="text-muted text-sm" style="padding:4px 0">' + FS.esc(c) + '</li>';
+            }).join('') + '</ul></div>';
+        }).join('') + '</div>' +
+
+        '<p class="text-center text-muted mt-8">Do not see your city? We add markets every month — ' +
+        '<a href="' + FS.url('pages/contact.html') + '">tell us where you are</a>.</p>'
+      ) + ctaBlock();
+
+    var search = document.getElementById('areaSearch');
+    search.addEventListener('input', function () {
+      var q = search.value.trim().toLowerCase();
+      FS.$$('#areaGrid [data-state]').forEach(function (card) {
+        var hit = !q || card.dataset.state.indexOf(q) > -1 || card.dataset.cities.indexOf(q) > -1;
+        card.classList.toggle('hidden', !hit);
+      });
+    });
+  }
+
+  function legalPage() {
+    var isPrivacy = /privacy/.test(window.location.pathname);
+    var blocks = isPrivacy
+      ? [['Information we collect', 'We collect the contact and fleet details you provide when you request an estimate or create an account: name, company, phone number, email address, service address and the vehicle information needed to perform the work.'],
+         ['How we use it', 'To schedule and perform your service, to send you project updates by SMS and email, to invoice you, and to maintain the maintenance and compliance record attached to each vehicle.'],
+         ['Sharing', 'We share your information with the technician assigned to your project and with our payment processor. We do not sell customer data.'],
+         ['Retention', 'Maintenance and inspection records are retained for the period required by federal and state regulation. You may request deletion of everything not subject to a retention requirement.'],
+         ['Your choices', 'You can opt out of marketing messages at any time. Transactional messages about an active project cannot be disabled while the project is open.'],
+         ['Contact', 'Questions about this policy can be sent to ' + C.email + '.']]
+      : [['Services', 'FleetSquad provides mobile fleet maintenance, repair, diagnostic and inspection services at the location you specify. Scope and pricing are confirmed in a written estimate that you approve before work begins.'],
+         ['Estimates and authorisation', 'No work is performed without your authorisation. A final invoice may not exceed an approved estimate without your written agreement to the additional scope.'],
+         ['Access and safety', 'You are responsible for providing safe and lawful access to the vehicles, including keys, gate codes and a work area that meets applicable safety requirements.'],
+         ['Warranty', 'Parts and labour carry a 12-month / 12,000-mile warranty. Warranty service is performed at the vehicle. The warranty does not cover damage from misuse, accident or unauthorised repair.'],
+         ['Payment', 'Invoices are due on the terms stated on the invoice. Accounts on a monthly agreement receive one consolidated invoice per period.'],
+         ['Limitation of liability', 'Our liability for any claim is limited to the amount paid for the service giving rise to the claim.']];
+
+    body.innerHTML = section(
+      '<div class="prose" style="max-width:78ch;margin-inline:auto">' +
+        '<p class="text-dim text-sm">Last updated ' + FS.date(new Date(Date.now() - 120 * 864e5).toISOString(), 'long') + '</p>' +
+        blocks.map(function (b) {
+          return '<h2>' + FS.esc(b[0]) + '</h2><p>' + FS.esc(b[1]) + '</p>';
+        }).join('') +
+      '</div>');
+  }
+
+  /* ======================================================================
+     Dispatch
+     ====================================================================== */
+
+  var ROUTES = {
+    'services-index':  servicesIndex,
+    'service-detail':  serviceDetail,
+    'industries-index':industriesIndex,
+    'industry-detail': industryDetail,
+    'vehicles-index':  vehiclesIndex,
+    'vehicle-detail':  vehicleDetail,
+    'blog-list':       blogList,
+    'blog-post':       blogPost,
+    'reviews':         reviewsPage,
+    'about':           aboutPage,
+    'partners':        partnersPage,
+    'careers':         careersPage,
+    'contact':         contactPage,
+    'faqs':            faqsPage,
+    'service-areas':   serviceAreasPage,
+    'legal':           legalPage
+  };
+
+  function init() {
+    var route = ROUTES[document.body.dataset.page];
+    if (route) route();
+    FS.hydrateIcons(document);
+  }
+
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
+  else init();
+})(window, document);

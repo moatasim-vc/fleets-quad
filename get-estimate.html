@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Get a Fleet Service Estimate | FleetSquad</title>
+<meta name="description" content="Tell us about your fleet and we will send a mobile ASE Master Tech to your location. Free estimate in minutes.">
+<link rel="icon" href="assets/img/logo-shield.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/css/variables.css">
+<link rel="stylesheet" href="assets/css/base.css">
+<link rel="stylesheet" href="assets/css/components.css">
+<link rel="stylesheet" href="assets/css/site.css">
+</head>
+<body>
+
+<div data-site-header></div>
+
+<main>
+  <section class="page-hero" style="padding-block:var(--sp-7) var(--sp-8)">
+    <div class="container page-hero-inner">
+      <nav class="crumbs" aria-label="Breadcrumb">
+        <a href="index.html">Home</a><span>/</span><strong>Get Estimate</strong>
+      </nav>
+      <h1>Get Your Free Fleet Estimate</h1>
+      <p>Two quick steps. We will match you with an ASE Master Tech and confirm your project by SMS and email.</p>
+    </div>
+  </section>
+
+  <section class="section" style="background:var(--page)">
+    <div class="container" style="max-width:880px">
+
+      <div class="card">
+        <div class="card-body">
+
+          <!-- Progress -------------------------------------------------- -->
+          <ol class="stepper" id="estStepper">
+            <li class="step is-active"><span class="step-dot">1</span><span class="step-label">Customer Information</span></li>
+            <li class="step"><span class="step-dot">2</span><span class="step-label">Vehicle Information</span></li>
+            <li class="step"><span class="step-dot">3</span><span class="step-label">Confirmation</span></li>
+          </ol>
+
+          <form id="estForm" novalidate>
+
+            <!-- ============================================================
+                 Step 1 — Customer information
+                 ============================================================ -->
+            <section class="est-step is-active" data-step="1">
+              <h2 class="mb-2" style="font-size:var(--fs-xl)">Customer Information</h2>
+              <p class="text-muted mb-6">So we know who to contact and where to send the technician.</p>
+
+              <div class="field-row field-row-2 mb-4">
+                <div class="field">
+                  <label class="label" for="firstName">First Name <span class="req">*</span></label>
+                  <input class="input" id="firstName" name="firstName" type="text" placeholder="Marcus" autocomplete="given-name" required>
+                </div>
+                <div class="field">
+                  <label class="label" for="lastName">Last Name <span class="req">*</span></label>
+                  <input class="input" id="lastName" name="lastName" type="text" placeholder="Reed" autocomplete="family-name" required>
+                </div>
+              </div>
+
+              <div class="field">
+                <label class="label" for="company">Company Name <span class="req">*</span></label>
+                <input class="input" id="company" name="company" type="text" placeholder="Nexa Logistics" autocomplete="organization" required>
+              </div>
+
+              <div class="field-row field-row-2 mb-4">
+                <div class="field">
+                  <label class="label" for="phone">Cell Phone <span class="req">*</span></label>
+                  <div class="input-icon">
+                    <i data-icon="phone-ring"></i>
+                    <input class="input" id="phone" name="phone" type="tel" placeholder="(212) 555-0142" autocomplete="tel" required>
+                  </div>
+                  <p class="hint">We text project updates to this number.</p>
+                </div>
+                <div class="field">
+                  <label class="label" for="email">Email Address <span class="req">*</span></label>
+                  <input class="input" id="email" name="email" type="email" placeholder="marcus@nexalogistics.com" autocomplete="email" required>
+                </div>
+              </div>
+
+              <div class="field-row field-row-3">
+                <div class="field">
+                  <label class="label" for="zip">Zip Code <span class="req">*</span></label>
+                  <input class="input" id="zip" name="zip" type="text" inputmode="numeric" maxlength="5" placeholder="10001" autocomplete="postal-code" required>
+                  <p class="hint" id="zipHint">City and state fill in automatically.</p>
+                </div>
+                <div class="field">
+                  <label class="label" for="city">City</label>
+                  <input class="input" id="city" name="city" type="text" placeholder="Auto-filled" readonly>
+                </div>
+                <div class="field">
+                  <label class="label" for="state">State</label>
+                  <input class="input" id="state" name="state" type="text" placeholder="Auto-filled" readonly>
+                </div>
+              </div>
+
+              <div class="row-between mt-8">
+                <a class="btn btn-ghost" href="index.html"><i data-icon="arrow-left"></i>Cancel</a>
+                <button class="btn btn-primary" type="button" data-next="2">Continue<i data-icon="arrow-right"></i></button>
+              </div>
+            </section>
+
+            <!-- ============================================================
+                 Step 2 — Vehicle information
+                 ============================================================ -->
+            <section class="est-step" data-step="2">
+              <h2 class="mb-2" style="font-size:var(--fs-xl)">Vehicle Information</h2>
+              <p class="text-muted mb-6">Tell us what needs doing, how many units and where they are.</p>
+
+              <div class="field-row field-row-2 mb-4">
+                <div class="field">
+                  <label class="label" for="serviceType">Service Type <span class="req">*</span></label>
+                  <select class="select" id="serviceType" name="serviceType" required>
+                    <option value="">Select a service…</option>
+                  </select>
+                </div>
+                <div class="field">
+                  <label class="label" for="urgency">Urgency <span class="req">*</span></label>
+                  <select class="select" id="urgency" name="urgency" required>
+                    <option value="">How soon?</option>
+                  </select>
+                </div>
+              </div>
+
+              <div class="field-row field-row-2 mb-4">
+                <div class="field">
+                  <label class="label" for="vehicleCount">Number of Vehicles <span class="req">*</span></label>
+                  <select class="select" id="vehicleCount" name="vehicleCount" required></select>
+                </div>
+                <div class="field">
+                  <label class="label" for="location">Vehicle Location <span class="req">*</span></label>
+                  <select class="select" id="location" name="location" required>
+                    <option value="">Where are the vehicles?</option>
+                  </select>
+                </div>
+              </div>
+
+              <!-- Google-Places-style address field (simulated) -->
+              <div class="field">
+                <label class="label" for="address">Address <span class="req">*</span></label>
+                <div class="autocomplete" id="addressAC">
+                  <div class="input-icon">
+                    <i data-icon="map-pin"></i>
+                    <input class="input" id="address" name="address" type="text" placeholder="Start typing an address…" autocomplete="off" required>
+                  </div>
+                  <div class="autocomplete-list" id="addressList" role="listbox"></div>
+                </div>
+                <p class="hint">Yard, terminal, job site or roadside mile marker — anywhere we can reach the vehicle.</p>
+              </div>
+
+              <div class="field">
+                <label class="label" for="details">Project Details <span class="req">*</span></label>
+                <textarea class="textarea" id="details" name="details" placeholder="Six box trucks flagged during pre-trip. Brake wear and two check-engine lights. Need all six back before Monday dispatch." required></textarea>
+              </div>
+
+              <div class="field">
+                <label class="label" id="uploadLabel">Photos <span class="text-dim text-xs">(optional — up to 5)</span></label>
+                <div class="upload" id="estUpload" role="button" tabindex="0" aria-labelledby="uploadLabel">
+                  <i data-icon="camera"></i>
+                  <strong>Tap to add photos</strong>
+                  <small>Damage, dashboard lights, VIN plates or the yard entrance. JPG or PNG.</small>
+                </div>
+                <input type="file" id="estFile" accept="image/*" multiple hidden>
+                <div class="thumbs" id="estThumbs"></div>
+              </div>
+
+              <div class="row-between mt-8">
+                <button class="btn btn-ghost" type="button" data-back="1"><i data-icon="arrow-left"></i>Back</button>
+                <button class="btn btn-primary" type="submit">Submit Request<i data-icon="send"></i></button>
+              </div>
+            </section>
+
+            <!-- ============================================================
+                 Step 3 — Confirmation
+                 ============================================================ -->
+            <section class="est-step" data-step="3" id="estDone"><!-- rendered on submit --></section>
+
+          </form>
+        </div>
+      </div>
+
+      <!-- Reassurance rail -->
+      <div class="grid grid-3 mt-6">
+        <div class="feature"><i data-icon="clock"></i><div><h4>Fast response</h4><p>Most ASAP requests are assigned within the hour.</p></div></div>
+        <div class="feature"><i data-icon="dollar"></i><div><h4>No obligation</h4><p>Estimates are free and you approve before work starts.</p></div></div>
+        <div class="feature"><i data-icon="shield"></i><div><h4>ASE Master Techs</h4><p>Certified across every make and model we service.</p></div></div>
+      </div>
+
+    </div>
+  </section>
+</main>
+
+<div data-site-footer></div>
+
+<script src="assets/js/icons.js"></script>
+<script src="assets/js/core.js"></script>
+<script src="assets/js/data.js"></script>
+<script src="assets/js/store.js"></script>
+<script src="assets/js/site.js"></script>
+<script src="assets/js/estimate.js"></script>
+</body>
+</html>
