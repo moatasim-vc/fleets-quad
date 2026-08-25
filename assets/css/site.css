@@ -394,7 +394,9 @@ body.drawer-open .drawer { transform: translateX(0); }
    Phone: stays on the navy. Desktop: sits on white, per the two PSDs.
    -------------------------------------------------------------------------- */
 
-.proof { background: var(--grad-hero); background-attachment: local; padding-bottom: var(--sp-7); }
+/* The white sheet below pulls up 30px, so the padding here has to cover that
+   plus the 50px the mobile PSD leaves between the logos and the sheet edge. */
+.proof { background: var(--grad-hero); background-attachment: local; padding-bottom: 80px; }
 
 .stats-bar {
   border-radius: var(--r-lg);
@@ -421,25 +423,27 @@ body.drawer-open .drawer { transform: translateX(0); }
   color: rgba(255, 255, 255, .92);
   font-size: 15px;
   font-weight: 700;
-  margin: var(--sp-7) 0 var(--sp-5);
+  /* 38px below, per the mobile PSD. */
+  margin: var(--sp-7) 0 38px;
 }
 .brand-row {
   display: flex;
+  /* One line at every width — the marks scale, they never wrap. */
   flex-wrap: nowrap;
   align-items: center;
   justify-content: center;
-  /* The three marks have to sit on one line from 320px up, so the gap and the
-     logo height both scale with the viewport rather than being fixed. */
-  gap: clamp(14px, 5vw, 26px);
+  /* 24px at the 393px design width, easing down so the row still fits at 320. */
+  gap: clamp(17px, 6.1vw, 24px);
 }
 /* The partner marks ship as transparent alpha masks (black ink, no plate), so
    on the navy they are inverted to white and dropped back to the soft grey the
-   mobile PSD uses. On the white desktop band the ink is simply lightened. */
+   mobile PSD uses. On the white desktop band the ink is simply lightened.
+   Each file carries its own optical padding, so this one height reproduces the
+   PSD's 84 / 93 / 102px lockup exactly. */
 .brand-row img {
-  height: clamp(22px, 7.2vw, 30px);
+  height: clamp(24px, 7.9vw, 31px);
   width: auto;
-  max-width: 32%;
-  min-width: 0;
+  flex: 0 0 auto;
   object-fit: contain;
   opacity: .74;
   filter: invert(1);
@@ -466,8 +470,10 @@ body.drawer-open .drawer { transform: translateX(0); }
   .stat-label { font-size: 16px; }
 
   .trust-title { color: var(--ink-500); font-size: 17px; margin: var(--sp-8) 0 var(--sp-6); }
-  .brand-row { flex-wrap: wrap; gap: 28px 56px; }
-  .brand-row img { height: 44px; max-width: none; opacity: .5; filter: none; }
+  /* All six marks, still on a single line — they scale with the viewport so the
+     row never wraps between 992px and the 1240px container cap. */
+  .brand-row { gap: clamp(20px, 3.6vw, 48px); }
+  .brand-row img { height: clamp(30px, 3.4vw, 44px); opacity: .5; filter: none; }
   .brand-row img:nth-child(n + 4) { display: block; }
 }
 

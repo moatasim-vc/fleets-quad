@@ -59,7 +59,8 @@
     { icon: 'clipboard-dollar',title: 'Transparent Pricing',text: 'Clear quotes, no surprises, and easy billing.' }
   ];
 
-  D.brands = ['penske', 'ryder', 'avis', 'budget', 'enterprise', 'uhaul'];
+  /* First three are the marks the mobile PSD carries, in its order. */
+  D.brands = ['penske', 'ryder', 'uhaul', 'avis', 'budget', 'enterprise'];
 
   /* ======================================================================
      Services · Industries · Vehicle types
