@@ -181,19 +181,39 @@ body.drawer-open .drawer-scrim { opacity: 1; visibility: visible; }
 }
 body.drawer-open .drawer { transform: translateX(0); }
 
+/* Lockup and phone number stack centred, per the client's nav reference. */
 .drawer-head {
+  position: relative;
   display: flex;
+  flex-direction: column;
   align-items: center;
-  justify-content: space-between;
-  gap: var(--sp-4);
-  padding: var(--sp-5);
+  gap: var(--sp-3);
+  padding: var(--sp-6) var(--sp-5) var(--sp-5);
   border-bottom: 1px solid rgba(255, 255, 255, .12);
 }
-.drawer-close { color: #fff; width: 36px; height: 36px; display: flex; align-items: center; justify-content: center; border-radius: var(--r-sm); }
-.drawer-close:hover { background: rgba(255, 255, 255, .1); }
-.drawer-close svg { width: 20px; height: 20px; }
+.brand--drawer { gap: 14px; }
+.brand--drawer .brand-mark { width: 52px; }
+.brand--drawer .brand-word { font-size: 28px; letter-spacing: .02em; }
+.drawer-phone {
+  color: #fff;
+  font-size: 19px;
+  font-weight: 700;
+  letter-spacing: .02em;
+}
+.drawer-close {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  color: rgba(255, 255, 255, .55);
+  width: 34px; height: 34px;
+  display: flex; align-items: center; justify-content: center;
+  border-radius: var(--r-sm);
+}
+.drawer-close:hover { background: rgba(255, 255, 255, .1); color: #fff; }
+.drawer-close svg { width: 19px; height: 19px; }
 
-.drawer-body { flex: 1 1 auto; overflow-y: auto; padding: var(--sp-4) var(--sp-5) var(--sp-8); }
+.drawer-body { flex: 1 1 auto; overflow-y: auto; padding: var(--sp-5); }
+.drawer-groups { margin-top: var(--sp-5); }
 
 .drawer-group + .drawer-group { border-top: 1px solid rgba(255, 255, 255, .1); }
 .drawer-toggle {
@@ -201,8 +221,8 @@ body.drawer-open .drawer { transform: translateX(0); }
   align-items: center;
   justify-content: space-between;
   width: 100%;
-  padding: 15px 0;
-  font-size: var(--fs-lg);
+  padding: 18px 0;
+  font-size: 21px;
   font-weight: 700;
   color: #fff;
   text-align: left;
@@ -221,11 +241,6 @@ body.drawer-open .drawer { transform: translateX(0); }
 .drawer-sub a:hover { color: #fff; border-left-color: var(--blue-500); }
 
 .drawer-foot { padding: var(--sp-5); border-top: 1px solid rgba(255, 255, 255, .12); display: grid; gap: var(--sp-3); }
-.drawer-call {
-  display: flex; align-items: center; justify-content: center; gap: 9px;
-  font-weight: 700; color: #fff; font-size: var(--fs-base);
-}
-.drawer-call svg { width: 17px; height: 17px; color: var(--blue-500); }
 
 /* --------------------------------------------------------------------------
    Hero
@@ -410,12 +425,25 @@ body.drawer-open .drawer { transform: translateX(0); }
 }
 .brand-row {
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   align-items: center;
   justify-content: center;
-  gap: 14px 18px;
+  /* The three marks have to sit on one line from 320px up, so the gap and the
+     logo height both scale with the viewport rather than being fixed. */
+  gap: clamp(14px, 5vw, 26px);
 }
-.brand-row img { height: 38px; width: auto; opacity: .82; filter: grayscale(1) brightness(1.75); }
+/* The partner marks ship as transparent alpha masks (black ink, no plate), so
+   on the navy they are inverted to white and dropped back to the soft grey the
+   mobile PSD uses. On the white desktop band the ink is simply lightened. */
+.brand-row img {
+  height: clamp(22px, 7.2vw, 30px);
+  width: auto;
+  max-width: 32%;
+  min-width: 0;
+  object-fit: contain;
+  opacity: .74;
+  filter: invert(1);
+}
 /* The PSD's phone screen only carries three of the six partner marks. */
 .brand-row img:nth-child(n + 4) { display: none; }
 
@@ -438,8 +466,8 @@ body.drawer-open .drawer { transform: translateX(0); }
   .stat-label { font-size: 16px; }
 
   .trust-title { color: var(--ink-500); font-size: 17px; margin: var(--sp-8) 0 var(--sp-6); }
-  .brand-row { gap: 24px 48px; }
-  .brand-row img { height: 52px; opacity: 1; filter: grayscale(1); }
+  .brand-row { flex-wrap: wrap; gap: 28px 56px; }
+  .brand-row img { height: 44px; max-width: none; opacity: .5; filter: none; }
   .brand-row img:nth-child(n + 4) { display: block; }
 }
 
@@ -1005,3 +1033,96 @@ body.drawer-open .drawer { transform: translateX(0); }
 .svc-card--full .svc-link svg { width: 17px; height: 17px; transition: transform var(--transition); }
 .svc-card--full:hover .svc-link svg { transform: translateX(4px); }
 .svc-card--full .svc-chevron { display: none; }
+
+/* --------------------------------------------------------------------------
+   Login screen
+   Standalone page — no site header or footer, just the lockup and the form.
+   -------------------------------------------------------------------------- */
+
+.auth-page { background: var(--grad-hero); min-height: 100dvh; }
+.auth {
+  min-height: 100dvh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--sp-7) var(--sp-5);
+}
+.auth-card {
+  width: 100%;
+  max-width: 440px;
+  background: var(--surface);
+  border-radius: var(--r-lg);
+  box-shadow: 0 24px 60px rgba(3, 12, 28, .38);
+  padding: var(--sp-7) var(--sp-6) var(--sp-6);
+  text-align: center;
+}
+.brand--auth { justify-content: center; margin-bottom: var(--sp-6); }
+.brand--auth .brand-mark { width: 46px; }
+.brand--auth .brand-word { font-size: 26px; color: var(--navy-900); }
+.brand--auth .brand-word i { color: var(--blue-600); }
+
+.auth-card h1 { font-size: 25px; color: var(--navy-900); margin-bottom: 8px; }
+.auth-lead { color: var(--ink-500); font-size: var(--fs-md); margin-bottom: var(--sp-6); }
+.auth-card form { text-align: left; }
+.auth-card .error-text[hidden] { display: none; }
+
+.auth-forgot {
+  display: block;
+  margin: var(--sp-4) auto 0;
+  color: var(--blue-600);
+  font-weight: 600;
+  font-size: var(--fs-sm);
+}
+.auth-forgot:hover { text-decoration: underline; }
+
+.auth-divider {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-4);
+  margin: var(--sp-6) 0 var(--sp-3);
+  color: var(--ink-400);
+  font-size: var(--fs-xs);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .06em;
+}
+.auth-divider::before,
+.auth-divider::after { content: ""; flex: 1 1 auto; height: 1px; background: var(--line); }
+
+.auth-hint { color: var(--ink-400); font-size: var(--fs-xs); margin-bottom: var(--sp-4); }
+
+.auth-roles { display: grid; gap: var(--sp-2); text-align: left; }
+.auth-role {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  width: 100%;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+  background: var(--surface);
+  cursor: pointer;
+  transition: border-color var(--transition), background var(--transition);
+}
+.auth-role:hover { border-color: var(--blue-500); background: var(--surface-2); }
+.auth-role-icon {
+  flex: none;
+  width: 36px; height: 36px;
+  border-radius: 10px;
+  background: var(--navy-800);
+  display: flex; align-items: center; justify-content: center;
+}
+.auth-role-icon svg { width: 19px; height: 19px; color: #fff; }
+.auth-role-body { flex: 1 1 auto; min-width: 0; }
+.auth-role-body strong { display: block; font-size: var(--fs-base); color: var(--ink-900); }
+.auth-role-body small { display: block; font-size: var(--fs-xs); color: var(--ink-400); }
+.auth-role > svg:last-child { width: 17px; height: 17px; color: var(--ink-400); flex: none; }
+
+.auth-back {
+  display: inline-block;
+  margin-top: var(--sp-6);
+  color: var(--ink-500);
+  font-size: var(--fs-sm);
+  font-weight: 600;
+}
+.auth-back:hover { color: var(--blue-600); }

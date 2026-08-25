@@ -25,16 +25,22 @@
           { view: 'new-sale',      label: 'New Sale',      icon: 'plus',        href: 'admin/new-sale.html' }
         ] },
         { title: 'People', items: [
-          { view: 'customers',     label: 'Customers',     icon: 'users',       href: 'admin/customers.html' },
+          { view: 'users',         label: 'All Users',     icon: 'users',       href: 'admin/users.html' },
+          { view: 'customers',     label: 'Customers',     icon: 'briefcase',   href: 'admin/customers.html' },
           { view: 'mechanics',     label: 'Mechanics',     icon: 'wrench',      href: 'admin/mechanics.html' }
         ] },
         { title: 'Money', items: [
           { view: 'payments',      label: 'Payments',      icon: 'credit-card', href: 'admin/payments.html' }
         ] },
         { title: 'Content', items: [
+          { view: 'blog',          label: 'Blog',          icon: 'edit',        href: 'admin/blog.html' },
+          { view: 'service-areas', label: 'Service Areas', icon: 'map',         href: 'admin/service-areas.html' },
           { view: 'reviews',       label: 'Reviews',       icon: 'review',      href: 'admin/reviews.html', count: 'pendingReviews' },
           { view: 'notifications', label: 'Notifications', icon: 'bell',        href: 'admin/notifications.html', count: 'unread' },
           { view: 'cms',           label: 'CMS Pages',     icon: 'file-text',   href: 'admin/cms.html' }
+        ] },
+        { title: 'System', items: [
+          { view: 'settings',      label: 'Settings',      icon: 'settings',    href: 'admin/settings.html' }
         ] }
       ]
     },
@@ -48,6 +54,9 @@
         ] },
         { title: 'Money', items: [
           { view: 'payouts',       label: 'Mechanic Payouts', icon: 'wallet',   href: 'manager/payouts.html' }
+        ] },
+        { title: 'People', items: [
+          { view: 'users',         label: 'Users',         icon: 'users',       href: 'manager/users.html' }
         ] },
         { title: 'Inbox', items: [
           { view: 'notifications', label: 'Notifications', icon: 'bell',        href: 'manager/notifications.html', count: 'unread' }
@@ -91,6 +100,9 @@
 
   var role = document.body.dataset.role;
   var view = document.body.dataset.view;
+  // Sub-screens keep their parent's sidebar item highlighted.
+  var VIEW_PARENT = { 'blog-edit': 'blog' };
+  var navView = VIEW_PARENT[view] || view;
   var config = NAV[role];
   if (!config) return;
 
@@ -117,7 +129,7 @@
       return '<div class="sidebar-section">' + FS.esc(g.title) + '</div>' +
         g.items.map(function (i) {
           var pill = i.count && n[i.count] ? '<span class="count">' + n[i.count] + '</span>' : '';
-          return '<a class="sidebar-link' + (i.view === view ? ' is-active' : '') + '" href="' + FS.url(i.href) + '">' +
+          return '<a class="sidebar-link' + (i.view === navView ? ' is-active' : '') + '" href="' + FS.url(i.href) + '">' +
             FS.icon(i.icon) + '<span>' + FS.esc(i.label) + '</span>' + pill + '</a>';
         }).join('');
     }).join('');
@@ -127,7 +139,7 @@
         '<div class="sidebar-head">' +
           '<a class="brand" href="' + FS.url(config.home) + '">' +
             '<img class="brand-mark" src="' + FS.url('assets/img/logo-shield.png') + '" alt="">' +
-            '<span class="brand-text"><span class="brand-word">FLEETS<i>QUAD</i></span></span>' +
+            '<span class="brand-text"><span class="brand-word">FLEET<i>SQUAD</i></span></span>' +
           '</a>' +
           '<button class="sidebar-close btn-icon btn-icon--bare" data-sidebar-close aria-label="Close menu" style="color:#fff">' +
             FS.icon('close') + '</button>' +
@@ -232,10 +244,29 @@
     host.outerHTML = sidebar();
     if (main) main.insertAdjacentHTML('afterbegin', topbar(title, subtitle));
 
+    /* While an admin or manager is viewing someone else's portal, a bar stays
+       on screen so it is never ambiguous whose account is open. */
+    if (Store.isImpersonating()) {
+      var boss = Store.impersonator();
+      document.body.classList.add('is-impersonating');
+      document.body.insertAdjacentHTML('afterbegin',
+        '<div class="impersonation-bar">' + FS.icon('eye') +
+          '<span>Viewing as <strong>' + FS.esc(session.name) + '</strong> (' + FS.esc(config.label) + ')' +
+          ' — signed in as ' + FS.esc(boss.name) + '</span>' +
+          '<button class="btn btn-xs btn-outline-light" data-stop-impersonating>Back to my account</button>' +
+        '</div>');
+    }
+
     /* Sidebar open / close on small screens */
     document.addEventListener('click', function (e) {
       if (e.target.closest('[data-sidebar-open]')) document.body.classList.add('sidebar-open');
       else if (e.target.closest('[data-sidebar-close]')) document.body.classList.remove('sidebar-open');
+
+      if (e.target.closest('[data-stop-impersonating]')) {
+        var back = Store.stopImpersonating();
+        window.location.href = FS.url(NAV[back.role].home);
+        return;
+      }
 
       if (e.target.closest('[data-read-all]')) {
         Store.markAllRead(role);

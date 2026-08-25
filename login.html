@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sign In to Your Fleet Portal | FleetSquad</title>
+<meta name="description" content="Sign in to your FleetSquad portal to track projects, vehicles, invoices and technician visits in real time.">
+<meta name="robots" content="noindex,follow">
+<link rel="canonical" href="https://www.fleetsquad.com/login">
+<link rel="icon" href="favicon.ico" sizes="any">
+<link rel="icon" type="image/png" sizes="32x32" href="assets/img/favicon-32.png">
+<link rel="icon" type="image/png" sizes="16x16" href="assets/img/favicon-16.png">
+<link rel="apple-touch-icon" sizes="180x180" href="assets/img/favicon-180.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700;800&amp;display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/css/variables.css">
+<link rel="stylesheet" href="assets/css/base.css">
+<link rel="stylesheet" href="assets/css/components.css">
+<link rel="stylesheet" href="assets/css/site.css">
+</head>
+<body class="auth-page">
+
+<main class="auth">
+  <div class="auth-card">
+
+    <a class="brand brand--auth" href="index.html" aria-label="FleetSquad home">
+      <img class="brand-mark" src="assets/img/logo-shield.png" alt="" width="256" height="416">
+      <span class="brand-text"><span class="brand-word">FLEET<i>SQUAD</i></span></span>
+    </a>
+
+    <h1>Sign in to your portal</h1>
+    <p class="auth-lead" id="authLead">Track every project, vehicle and invoice in real time.</p>
+
+    <form id="loginForm" novalidate>
+      <div class="field">
+        <label class="label" for="loginEmail">Email address <span class="req">*</span></label>
+        <input class="input" id="loginEmail" name="email" type="email" autocomplete="username"
+               placeholder="you@yourcompany.com" required>
+      </div>
+      <div class="field">
+        <label class="label" for="loginPassword">Password <span class="req">*</span></label>
+        <input class="input" id="loginPassword" name="password" type="password" autocomplete="current-password"
+               placeholder="••••••••" required>
+      </div>
+
+      <p class="error-text" id="loginError" role="alert" hidden></p>
+
+      <button class="btn btn-primary btn-block btn-lg mt-5" type="submit">Sign In</button>
+    </form>
+
+    <button class="auth-forgot" type="button" id="forgotLink">Forgot your password?</button>
+
+    <div class="auth-divider"><span>Demo accounts</span></div>
+    <p class="auth-hint">This is a front-end prototype — pick a role to sign straight in.</p>
+    <div class="auth-roles" id="authRoles"><!-- rendered by login.js --></div>
+
+    <a class="auth-back" href="index.html">&larr; Back to FleetSquad.com</a>
+  </div>
+</main>
+
+<script src="assets/js/icons.js"></script>
+<script src="assets/js/core.js"></script>
+<script src="assets/js/data.js"></script>
+<script src="assets/js/store.js"></script>
+<script src="assets/js/login.js"></script>
+</body>
+</html>

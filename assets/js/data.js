@@ -318,9 +318,9 @@
     { label: 'Industries', children: D.industries.map(function (i) { return { label: i.name, href: 'industry.html?i=' + i.slug }; }) },
     { label: 'Vehicles',   children: D.vehicleTypes.map(function (v) { return { label: v.name, href: 'vehicle.html?v=' + v.slug }; }) },
     { label: 'Resources',  children: [
-        { label: 'Service Areas', href: 'pages/service-areas.html' },
-        { label: 'Blog',          href: 'blog.html' },
-        { label: 'FAQs',          href: 'pages/faqs.html' }
+        { label: 'Service Area', href: 'pages/service-areas.html' },
+        { label: 'Blog',         href: 'blog.html' },
+        { label: 'FAQS',         href: 'pages/faqs.html' }
     ] },
     { label: 'Company',    children: [
         { label: 'About Us', href: 'pages/about.html' },
@@ -334,7 +334,7 @@
      Get Estimate form options
      ====================================================================== */
 
-  D.serviceTypes = ['Fleet Repair', 'Prepurchase Inspection', 'Mobile Diagnosis', 'Preventive Maintenance', 'Roadside Service'];
+  D.serviceTypes = ['Mobile Fleet Repair', 'Prepurchase Inspection', 'Mobile Diagnosis', 'Preventive Maintenance', 'Roadside Service'];
   D.urgencies    = ['ASAP', 'Within 24 Hours', 'Within 48 Hours', 'Within a Week'];
   D.locations    = ['Garage', 'Parking Lot', 'Highway', 'Gated Area', 'Commercial Residence', 'Out in Grass'];
 
@@ -363,23 +363,74 @@
     '48201': { city: 'Detroit',     state: 'MI' }
   };
 
+  /* Coverage map. Each row is fully editable from Admin → Service Areas:
+     the state can be switched on or off, and counties and cities added or
+     removed. The public "check if we are in your area" page reads the same
+     records out of the store, so an edit shows up on the site immediately. */
   D.serviceAreas = [
-    { state: 'New York',      cities: ['New York', 'Brooklyn', 'Queens', 'Yonkers', 'Buffalo', 'Albany'] },
-    { state: 'New Jersey',    cities: ['Jersey City', 'Newark', 'Elizabeth', 'Paterson', 'Trenton'] },
-    { state: 'Pennsylvania',  cities: ['Philadelphia', 'Pittsburgh', 'Allentown', 'Erie'] },
-    { state: 'Georgia',       cities: ['Atlanta', 'Savannah', 'Augusta', 'Columbus'] },
-    { state: 'Florida',       cities: ['Miami', 'Orlando', 'Tampa', 'Jacksonville', 'Fort Lauderdale'] },
-    { state: 'Illinois',      cities: ['Chicago', 'Aurora', 'Naperville', 'Rockford'] },
-    { state: 'Texas',         cities: ['Dallas', 'Houston', 'Austin', 'San Antonio', 'Fort Worth', 'El Paso'] },
-    { state: 'Colorado',      cities: ['Denver', 'Colorado Springs', 'Aurora', 'Fort Collins'] },
-    { state: 'Arizona',       cities: ['Phoenix', 'Tucson', 'Mesa', 'Scottsdale'] },
-    { state: 'California',    cities: ['Los Angeles', 'San Francisco', 'San Diego', 'Sacramento', 'Fresno', 'Oakland'] },
-    { state: 'Washington',    cities: ['Seattle', 'Tacoma', 'Spokane', 'Bellevue'] },
-    { state: 'Massachusetts', cities: ['Boston', 'Worcester', 'Springfield', 'Cambridge'] },
-    { state: 'North Carolina',cities: ['Charlotte', 'Raleigh', 'Greensboro', 'Durham'] },
-    { state: 'Tennessee',     cities: ['Nashville', 'Memphis', 'Knoxville', 'Chattanooga'] },
-    { state: 'Michigan',      cities: ['Detroit', 'Grand Rapids', 'Ann Arbor', 'Lansing'] },
-    { state: 'Nevada',        cities: ['Las Vegas', 'Reno', 'Henderson'] }
+    { id: 'SA-01', code: 'NY', state: 'New York',      active: true,
+      counties: ['New York', 'Kings', 'Queens', 'Westchester', 'Erie', 'Albany'],
+      cities: ['New York', 'Brooklyn', 'Queens', 'Yonkers', 'Buffalo', 'Albany'] },
+    { id: 'SA-02', code: 'NJ', state: 'New Jersey',    active: true,
+      counties: ['Hudson', 'Essex', 'Union', 'Passaic', 'Mercer'],
+      cities: ['Jersey City', 'Newark', 'Elizabeth', 'Paterson', 'Trenton'] },
+    { id: 'SA-03', code: 'PA', state: 'Pennsylvania',  active: true,
+      counties: ['Philadelphia', 'Allegheny', 'Lehigh', 'Erie'],
+      cities: ['Philadelphia', 'Pittsburgh', 'Allentown', 'Erie'] },
+    { id: 'SA-04', code: 'GA', state: 'Georgia',       active: true,
+      counties: ['Fulton', 'Chatham', 'Richmond', 'Muscogee'],
+      cities: ['Atlanta', 'Savannah', 'Augusta', 'Columbus'] },
+    { id: 'SA-05', code: 'FL', state: 'Florida',       active: true,
+      counties: ['Miami-Dade', 'Orange', 'Hillsborough', 'Duval', 'Broward'],
+      cities: ['Miami', 'Orlando', 'Tampa', 'Jacksonville', 'Fort Lauderdale'] },
+    { id: 'SA-06', code: 'IL', state: 'Illinois',      active: true,
+      counties: ['Cook', 'Kane', 'DuPage', 'Winnebago'],
+      cities: ['Chicago', 'Aurora', 'Naperville', 'Rockford'] },
+    { id: 'SA-07', code: 'TX', state: 'Texas',         active: true,
+      counties: ['Dallas', 'Harris', 'Travis', 'Bexar', 'Tarrant', 'El Paso'],
+      cities: ['Dallas', 'Houston', 'Austin', 'San Antonio', 'Fort Worth', 'El Paso'] },
+    { id: 'SA-08', code: 'CO', state: 'Colorado',      active: true,
+      counties: ['Denver', 'El Paso', 'Arapahoe', 'Larimer'],
+      cities: ['Denver', 'Colorado Springs', 'Aurora', 'Fort Collins'] },
+    { id: 'SA-09', code: 'AZ', state: 'Arizona',       active: true,
+      counties: ['Maricopa', 'Pima'],
+      cities: ['Phoenix', 'Tucson', 'Mesa', 'Scottsdale'] },
+    { id: 'SA-10', code: 'CA', state: 'California',    active: true,
+      counties: ['Los Angeles', 'San Francisco', 'San Diego', 'Sacramento', 'Fresno', 'Alameda'],
+      cities: ['Los Angeles', 'San Francisco', 'San Diego', 'Sacramento', 'Fresno', 'Oakland'] },
+    { id: 'SA-11', code: 'WA', state: 'Washington',    active: true,
+      counties: ['King', 'Pierce', 'Spokane'],
+      cities: ['Seattle', 'Tacoma', 'Spokane', 'Bellevue'] },
+    { id: 'SA-12', code: 'MA', state: 'Massachusetts', active: true,
+      counties: ['Suffolk', 'Worcester', 'Hampden', 'Middlesex'],
+      cities: ['Boston', 'Worcester', 'Springfield', 'Cambridge'] },
+    { id: 'SA-13', code: 'NC', state: 'North Carolina',active: true,
+      counties: ['Mecklenburg', 'Wake', 'Guilford', 'Durham'],
+      cities: ['Charlotte', 'Raleigh', 'Greensboro', 'Durham'] },
+    { id: 'SA-14', code: 'TN', state: 'Tennessee',     active: true,
+      counties: ['Davidson', 'Shelby', 'Knox', 'Hamilton'],
+      cities: ['Nashville', 'Memphis', 'Knoxville', 'Chattanooga'] },
+    { id: 'SA-15', code: 'MI', state: 'Michigan',      active: true,
+      counties: ['Wayne', 'Kent', 'Washtenaw', 'Ingham'],
+      cities: ['Detroit', 'Grand Rapids', 'Ann Arbor', 'Lansing'] },
+    { id: 'SA-16', code: 'NV', state: 'Nevada',        active: true,
+      counties: ['Clark', 'Washoe'],
+      cities: ['Las Vegas', 'Reno', 'Henderson'] }
+  ];
+
+  /* Every US state, so the coverage map can shade the ones we are not in yet
+     and the admin screen can offer them when adding a new area. */
+  D.usStates = [
+    ['AL', 'Alabama'], ['AK', 'Alaska'], ['AZ', 'Arizona'], ['AR', 'Arkansas'], ['CA', 'California'],
+    ['CO', 'Colorado'], ['CT', 'Connecticut'], ['DE', 'Delaware'], ['FL', 'Florida'], ['GA', 'Georgia'],
+    ['HI', 'Hawaii'], ['ID', 'Idaho'], ['IL', 'Illinois'], ['IN', 'Indiana'], ['IA', 'Iowa'],
+    ['KS', 'Kansas'], ['KY', 'Kentucky'], ['LA', 'Louisiana'], ['ME', 'Maine'], ['MD', 'Maryland'],
+    ['MA', 'Massachusetts'], ['MI', 'Michigan'], ['MN', 'Minnesota'], ['MS', 'Mississippi'], ['MO', 'Missouri'],
+    ['MT', 'Montana'], ['NE', 'Nebraska'], ['NV', 'Nevada'], ['NH', 'New Hampshire'], ['NJ', 'New Jersey'],
+    ['NM', 'New Mexico'], ['NY', 'New York'], ['NC', 'North Carolina'], ['ND', 'North Dakota'], ['OH', 'Ohio'],
+    ['OK', 'Oklahoma'], ['OR', 'Oregon'], ['PA', 'Pennsylvania'], ['RI', 'Rhode Island'], ['SC', 'South Carolina'],
+    ['SD', 'South Dakota'], ['TN', 'Tennessee'], ['TX', 'Texas'], ['UT', 'Utah'], ['VT', 'Vermont'],
+    ['VA', 'Virginia'], ['WA', 'Washington'], ['WV', 'West Virginia'], ['WI', 'Wisconsin'], ['WY', 'Wyoming']
   ];
 
   /* ======================================================================
@@ -398,18 +449,18 @@
   ];
 
   D.mechanics = [
-    { id: 'MEC-01', name: 'Carlos Mendez',   email: 'carlos@fleetsquad.com',  phone: '(212) 555-0301', certs: 'ASE Master · Diesel', city: 'New York',      state: 'NY', rating: 4.9, jobsDone: 312, hourlyRate: 68, status: 'available' },
-    { id: 'MEC-02', name: 'Derrick Hall',    email: 'derrick@fleetsquad.com', phone: '(312) 555-0302', certs: 'ASE Master · Brakes',  city: 'Chicago',       state: 'IL', rating: 4.8, jobsDone: 268, hourlyRate: 64, status: 'on-job' },
-    { id: 'MEC-03', name: 'Nina Patel',      email: 'nina@fleetsquad.com',    phone: '(713) 555-0303', certs: 'ASE Master · Electrical', city: 'Houston',    state: 'TX', rating: 5.0, jobsDone: 401, hourlyRate: 72, status: 'available' },
-    { id: 'MEC-04', name: 'Sam Okafor',      email: 'sam@fleetsquad.com',     phone: '(602) 555-0304', certs: 'ASE · HVAC · Diesel',  city: 'Phoenix',       state: 'AZ', rating: 4.7, jobsDone: 189, hourlyRate: 61, status: 'available' },
-    { id: 'MEC-05', name: 'Ruth Delacroix',  email: 'ruth@fleetsquad.com',    phone: '(206) 555-0305', certs: 'ASE Master · Inspector',city: 'Seattle',      state: 'WA', rating: 4.9, jobsDone: 224, hourlyRate: 66, status: 'on-job' },
-    { id: 'MEC-06', name: 'Victor Alvarez',  email: 'victor@fleetsquad.com',  phone: '(415) 555-0306', certs: 'ASE Master · Driveline',city: 'San Francisco',state: 'CA', rating: 4.8, jobsDone: 157, hourlyRate: 70, status: 'off-duty' }
+    { id: 'MEC-01', name: 'Carlos Mendez',   email: 'carlos@fleetsquad.com',  phone: '(212) 555-0301', certs: 'ASE Master · Diesel', city: 'New York',      state: 'NY', rating: 4.9, jobsDone: 312, hourlyRate: 68, status: 'available', since: daysAgo(520) },
+    { id: 'MEC-02', name: 'Derrick Hall',    email: 'derrick@fleetsquad.com', phone: '(312) 555-0302', certs: 'ASE Master · Brakes',  city: 'Chicago',       state: 'IL', rating: 4.8, jobsDone: 268, hourlyRate: 64, status: 'on-job', since: daysAgo(430) },
+    { id: 'MEC-03', name: 'Nina Patel',      email: 'nina@fleetsquad.com',    phone: '(713) 555-0303', certs: 'ASE Master · Electrical', city: 'Houston',    state: 'TX', rating: 5.0, jobsDone: 401, hourlyRate: 72, status: 'available', since: daysAgo(365) },
+    { id: 'MEC-04', name: 'Sam Okafor',      email: 'sam@fleetsquad.com',     phone: '(602) 555-0304', certs: 'ASE · HVAC · Diesel',  city: 'Phoenix',       state: 'AZ', rating: 4.7, jobsDone: 189, hourlyRate: 61, status: 'available', since: daysAgo(240) },
+    { id: 'MEC-05', name: 'Ruth Delacroix',  email: 'ruth@fleetsquad.com',    phone: '(206) 555-0305', certs: 'ASE Master · Inspector',city: 'Seattle',      state: 'WA', rating: 4.9, jobsDone: 224, hourlyRate: 66, status: 'on-job', since: daysAgo(150) },
+    { id: 'MEC-06', name: 'Victor Alvarez',  email: 'victor@fleetsquad.com',  phone: '(415) 555-0306', certs: 'ASE Master · Driveline',city: 'San Francisco',state: 'CA', rating: 4.8, jobsDone: 157, hourlyRate: 70, status: 'off-duty', since: daysAgo(64) }
   ];
 
   D.managers = [
-    { id: 'MGR-01', name: 'Alicia Grant',  email: 'alicia@fleetsquad.com',  phone: '(888) 555-0401', region: 'East',    projects: 14 },
-    { id: 'MGR-02', name: 'Wes Donovan',   email: 'wes@fleetsquad.com',     phone: '(888) 555-0402', region: 'Central', projects: 11 },
-    { id: 'MGR-03', name: 'Kaito Ishida',  email: 'kaito@fleetsquad.com',   phone: '(888) 555-0403', region: 'West',    projects: 9 }
+    { id: 'MGR-01', name: 'Alicia Grant',  email: 'alicia@fleetsquad.com',  phone: '(888) 555-0401', region: 'East',    projects: 14, city: 'New York', state: 'NY', since: daysAgo(700) },
+    { id: 'MGR-02', name: 'Wes Donovan',   email: 'wes@fleetsquad.com',     phone: '(888) 555-0402', region: 'Central', projects: 11, city: 'Chicago', state: 'IL', since: daysAgo(520) },
+    { id: 'MGR-03', name: 'Kaito Ishida',  email: 'kaito@fleetsquad.com',   phone: '(888) 555-0403', region: 'West',    projects: 9, city: 'San Francisco', state: 'CA', since: daysAgo(300) }
   ];
 
   /* Demo login accounts. Passwords are cosmetic — the login screen accepts
@@ -521,7 +572,7 @@
   }
 
   D.orders = [
-    makeOrder({ id: 'PRJ-1232', customerId: 'CUS-1001', serviceType: 'Fleet Repair', urgency: 'Within 24 Hours',
+    makeOrder({ id: 'PRJ-1232', customerId: 'CUS-1001', serviceType: 'Mobile Fleet Repair', urgency: 'Within 24 Hours',
       count: 6, status: 'assigned', payment: 'unpaid', mechanicId: 'MEC-01', managerId: 'MGR-01', seed: 3,
       createdAt: daysAgo(2, 9), address: '440 Hudson Yards Depot', city: 'New York', state: 'NY', zip: '10001',
       location: 'Garage', details: 'Six box trucks flagged during pre-trip. Brake wear and two check-engine lights. Need all six back before Monday dispatch.',
@@ -542,7 +593,7 @@
         { at: daysAgo(3, 17), who: 'Sam Okafor',    text: 'All 12 vehicles marked repair complete' },
         { at: daysAgo(3, 18), who: 'System',        text: 'Stripe payment link sent to Summit Rentals' }
       ] }),
-    makeOrder({ id: 'PRJ-1230', customerId: 'CUS-1002', serviceType: 'Fleet Repair', urgency: 'ASAP',
+    makeOrder({ id: 'PRJ-1230', customerId: 'CUS-1002', serviceType: 'Mobile Fleet Repair', urgency: 'ASAP',
       count: 4, status: 'needs-manager', payment: 'unpaid', mechanicId: 'MEC-02', managerId: 'MGR-02', seed: 5,
       createdAt: daysAgo(1, 7), address: '1500 W Cermak Rd Depot', city: 'Chicago', state: 'IL', zip: '60601',
       location: 'Gated Area', details: 'Two vans will not start after cold snap. Customer is asking to add two more units to the same visit — needs manager approval on quantity.',
@@ -578,7 +629,7 @@
       createdAt: daysAgo(0, 11), address: '88 Market Street Garage, Level B2', city: 'San Francisco', state: 'CA', zip: '94102',
       location: 'Commercial Residence', details: 'Executive pool cars due for scheduled service. Building requires 24h notice for garage access.',
       vehicleStatuses: ['Not Started'] }),
-    makeOrder({ id: 'PRJ-1226', customerId: 'CUS-1007', serviceType: 'Fleet Repair', urgency: 'Within 24 Hours',
+    makeOrder({ id: 'PRJ-1226', customerId: 'CUS-1007', serviceType: 'Mobile Fleet Repair', urgency: 'Within 24 Hours',
       count: 5, status: 'assigned', payment: 'partial', mechanicId: 'MEC-01', managerId: 'MGR-01', seed: 23,
       createdAt: daysAgo(4, 13), address: '9100 Fulton Industrial Blvd', city: 'Atlanta', state: 'GA', zip: '30301',
       location: 'Garage', details: 'Five tractors due for air system service ahead of a DOT audit next month.',
@@ -608,7 +659,7 @@
       createdAt: daysAgo(34, 9), address: '440 Hudson Yards Depot', city: 'New York', state: 'NY', zip: '10001',
       location: 'Garage', details: 'Monthly PM rotation for the New York depot.',
       vehicleStatuses: ['Repair Complete'] }),
-    makeOrder({ id: 'PRJ-1222', customerId: 'CUS-1004', serviceType: 'Fleet Repair', urgency: 'ASAP',
+    makeOrder({ id: 'PRJ-1222', customerId: 'CUS-1004', serviceType: 'Mobile Fleet Repair', urgency: 'ASAP',
       count: 3, status: 'assigned', payment: 'unpaid', mechanicId: 'MEC-04', managerId: 'MGR-03', seed: 41,
       createdAt: daysAgo(1, 15), address: '2200 Sky Harbor Circle', city: 'Phoenix', state: 'AZ', zip: '85001',
       location: 'Parking Lot', details: 'Three units failed the return inspection — brakes and one HVAC failure.',
@@ -641,9 +692,9 @@
 
   D.notifications = [
     { id: 'N-501', channel: 'sms',   audience: 'admin',    orderId: 'PRJ-1232', title: 'New Project #PRJ-1232',
-      body: 'Service Type: Fleet Repair\nVehicles: 6\nDetails: Six box trucks flagged during pre-trip.\nCity: New York, NY', at: daysAgo(2, 9), read: false },
+      body: 'Service Type: Mobile Fleet Repair\nVehicles: 6\nDetails: Six box trucks flagged during pre-trip.\nCity: New York, NY', at: daysAgo(2, 9), read: false },
     { id: 'N-502', channel: 'sms',   audience: 'mechanic', orderId: 'PRJ-1232', title: 'New Project Assigned',
-      body: 'Project ID: PRJ-1232\nService Type: Fleet Repair\nLocation: 440 Hudson Yards Depot, New York, NY', at: daysAgo(2, 11), read: false },
+      body: 'Project ID: PRJ-1232\nService Type: Mobile Fleet Repair\nLocation: 440 Hudson Yards Depot, New York, NY', at: daysAgo(2, 11), read: false },
     { id: 'N-503', channel: 'email', audience: 'customer', orderId: 'PRJ-1231', title: 'Your invoice is ready',
       body: 'Project PRJ-1231 is complete. 12 vehicles serviced. Amount due $9,842.00. Pay securely with the link in this email.', at: daysAgo(3, 18), read: false },
     { id: 'N-504', channel: 'sms',   audience: 'admin',    orderId: 'PRJ-1230', title: 'Manager attention needed',
@@ -651,7 +702,7 @@
     { id: 'N-505', channel: 'email', audience: 'customer', orderId: 'PRJ-1232', title: 'Technician assigned',
       body: 'Carlos Mendez (ASE Master) has been assigned to project PRJ-1232. First visit scheduled for tomorrow 8:00am.', at: daysAgo(2, 11), read: true },
     { id: 'N-506', channel: 'sms',   audience: 'mechanic', orderId: 'PRJ-1222', title: 'New Project Assigned',
-      body: 'Project ID: PRJ-1222\nService Type: Fleet Repair\nLocation: 2200 Sky Harbor Circle, Phoenix, AZ', at: daysAgo(1, 15), read: true },
+      body: 'Project ID: PRJ-1222\nService Type: Mobile Fleet Repair\nLocation: 2200 Sky Harbor Circle, Phoenix, AZ', at: daysAgo(1, 15), read: true },
     { id: 'N-507', channel: 'email', audience: 'admin',    orderId: 'PRJ-1229', title: 'Payment received',
       body: 'Ironbridge Construction paid $2,410.00 against project PRJ-1229 via Stripe.', at: daysAgo(11, 11), read: true },
     { id: 'N-508', channel: 'email', audience: 'customer', orderId: null,       title: 'How did we do?',
@@ -756,19 +807,73 @@
       ] }
   ];
 
+  /* Every post carries its own SEO record and a list of sibling slugs, so the
+     blog editor can cross-link articles without touching the markup. Defaults
+     are filled in here rather than repeated on each object above. */
+  D.posts.forEach(function (p, i) {
+    p.status         = p.status || 'published';
+    p.metaTitle      = p.metaTitle || p.title + ' | FleetSquad';
+    p.metaDescription = p.metaDescription || p.excerpt.slice(0, 155);
+    p.keywords       = p.keywords || ['fleet maintenance', p.category.toLowerCase(), 'mobile fleet service'].join(', ');
+    // Seed each article with the two that follow it so the "related" rail is
+    // populated out of the box; every link is editable in the admin.
+    p.related = p.related || [
+      D.posts[(i + 1) % D.posts.length].slug,
+      D.posts[(i + 2) % D.posts.length].slug
+    ];
+  });
+
   /* ======================================================================
      CMS pages — editable content blocks
      ====================================================================== */
 
   D.cmsPages = [
-    { slug: 'about',         title: 'About Us',      updated: daysAgo(6),  status: 'published', sections: 4 },
-    { slug: 'partners',      title: 'Partners',      updated: daysAgo(14), status: 'published', sections: 3 },
-    { slug: 'careers',       title: 'Careers',       updated: daysAgo(3),  status: 'published', sections: 3 },
-    { slug: 'contact',       title: 'Contact',       updated: daysAgo(21), status: 'published', sections: 2 },
-    { slug: 'faqs',          title: 'FAQ',           updated: daysAgo(9),  status: 'published', sections: 1 },
-    { slug: 'service-areas', title: 'Service Areas', updated: daysAgo(31), status: 'published', sections: 2 },
-    { slug: 'privacy',       title: 'Privacy Policy',updated: daysAgo(120),status: 'published', sections: 1 },
-    { slug: 'terms',         title: 'Terms of Service', updated: daysAgo(120), status: 'draft',  sections: 1 }
+    { slug: 'about', title: 'About Us', updated: daysAgo(6), status: 'published', sections: 4,
+      heading: 'Mobile fleet maintenance, built around uptime',
+      lead: 'We started FleetSquad because a vehicle driven to a shop is already costing you money.',
+      metaTitle: 'About FleetSquad | Mobile Fleet Maintenance Company',
+      metaDescription: 'FleetSquad is a nationwide mobile fleet maintenance company. ASE Master Techs service your trucks, vans and cars at your yard, terminal or job site.',
+      keywords: 'about fleetsquad, mobile fleet maintenance company, ase master techs' },
+    { slug: 'partners', title: 'Partners', updated: daysAgo(14), status: 'published', sections: 3,
+      heading: 'The fleets and networks we run with',
+      lead: 'National rental, leasing and logistics networks trust FleetSquad with their uptime.',
+      metaTitle: 'Fleet Maintenance Partners | FleetSquad',
+      metaDescription: 'FleetSquad partners with national rental, leasing and logistics networks to deliver consistent mobile maintenance across every market they operate in.',
+      keywords: 'fleet maintenance partners, fleet service network, mobile maintenance partner' },
+    { slug: 'careers', title: 'Careers', updated: daysAgo(3), status: 'published', sections: 3,
+      heading: 'Build a career in the field, not in a bay',
+      lead: 'ASE Master Techs, dispatchers and operations people wanted across every market.',
+      metaTitle: 'Careers & Mobile Technician Jobs | FleetSquad',
+      metaDescription: 'Hiring ASE Master Techs, mobile diesel technicians, dispatchers and operations staff across our national service areas. See open FleetSquad roles.',
+      keywords: 'mobile mechanic jobs, diesel technician careers, ase master tech jobs' },
+    { slug: 'contact', title: 'Contact', updated: daysAgo(21), status: 'published', sections: 2,
+      heading: 'Talk to a fleet coordinator',
+      lead: 'Call, email or send us the details and we will come back the same day.',
+      metaTitle: 'Contact FleetSquad | 1-888-391-MECH',
+      metaDescription: 'Reach FleetSquad on 1-888-391-MECH, everyday 9am to 9pm, with a 24-7 dispatch network. Send us your fleet details and we will respond the same day.',
+      keywords: 'contact fleetsquad, fleet service phone number, mobile fleet repair contact' },
+    { slug: 'faqs', title: 'FAQs', updated: daysAgo(9), status: 'published', sections: 1,
+      heading: 'Frequently asked questions',
+      lead: 'Everything fleet managers ask us before their first visit.',
+      metaTitle: 'Mobile Fleet Maintenance FAQs | FleetSquad',
+      metaDescription: 'How fast we arrive, how pricing works, what mobile service covers, DOT inspections, warranty and payment terms — answered for fleet managers.',
+      keywords: 'fleet maintenance faq, mobile mechanic questions, dot inspection faq' },
+    { slug: 'service-areas', title: 'Service Area', updated: daysAgo(31), status: 'published', sections: 2,
+      heading: 'Check if we are in your area',
+      lead: 'Search by city, county or state to see the coverage nearest you.',
+      metaTitle: 'Service Areas & Coverage Map | FleetSquad',
+      metaDescription: 'See every state, county and metro FleetSquad covers. Search your city to confirm mobile fleet maintenance and roadside coverage in your area.',
+      keywords: 'fleet service areas, mobile mechanic coverage map, fleet repair near me' },
+    { slug: 'privacy', title: 'Privacy Policy', updated: daysAgo(120), status: 'published', sections: 1,
+      heading: 'Privacy policy', lead: 'How we handle the information you share with us.',
+      metaTitle: 'Privacy Policy | FleetSquad',
+      metaDescription: 'How FleetSquad collects, uses, shares and retains customer and fleet information, and the choices available to you.',
+      keywords: 'privacy policy, data protection' },
+    { slug: 'terms', title: 'Terms of Service', updated: daysAgo(120), status: 'draft', sections: 1,
+      heading: 'Terms of service', lead: 'The terms that govern the work we do for you.',
+      metaTitle: 'Terms of Service | FleetSquad',
+      metaDescription: 'The terms covering FleetSquad estimates, authorisation, site access, warranty, payment and liability for mobile fleet maintenance work.',
+      keywords: 'terms of service, fleet repair terms' }
   ];
 
   D.faqs = [
@@ -817,5 +922,66 @@
     { title: 'First multi-state contract',      year: '2018', text: 'A regional rental network asked us to cover four states. We built the dispatch platform that still runs the business today.' },
     { title: '100,000 vehicles serviced',       year: '2021', text: 'The hundred-thousandth work order closed on a box truck in Newark, at 4:40am, in the rain.' },
     { title: 'Nationwide service network',      year: '2024', text: 'Sixteen states, a 24-7 dispatch desk and a quarter of a million vehicles serviced.' }
+  ];
+
+  /* ======================================================================
+     Stripe connection checklist
+     Exactly what has to come out of the FleetSquad Stripe account before
+     charges, payment links and payouts can be switched from simulated to
+     live. Rendered on Admin → Settings.
+     ====================================================================== */
+
+  D.stripeSetup = [
+    { key: 'publishableKey', label: 'Publishable key', group: 'API keys', required: true,
+      placeholder: 'pk_live_…',
+      where: 'Stripe Dashboard → Developers → API keys → Publishable key',
+      why: 'Loads Stripe.js in the browser so card numbers are typed into a Stripe-hosted field and never touch our server.',
+      secret: false },
+    { key: 'secretKey', label: 'Secret key', group: 'API keys', required: true,
+      placeholder: 'sk_live_…',
+      where: 'Stripe Dashboard → Developers → API keys → Secret key (reveal once)',
+      why: 'Creates the charge, the payment link and the refund. Server-side only — never paste it anywhere public.',
+      secret: true },
+    { key: 'webhookSecret', label: 'Webhook signing secret', group: 'API keys', required: true,
+      placeholder: 'whsec_…',
+      where: 'Stripe Dashboard → Developers → Webhooks → add endpoint → Signing secret',
+      why: 'Proves an incoming "payment succeeded" call really came from Stripe before we mark a project paid.',
+      secret: true },
+    { key: 'accountId', label: 'Stripe account ID', group: 'Account', required: true,
+      placeholder: 'acct_…',
+      where: 'Stripe Dashboard → Settings → Business → Account details',
+      why: 'Identifies which Stripe account the money lands in.',
+      secret: false },
+    { key: 'currency', label: 'Default currency', group: 'Account', required: true,
+      placeholder: 'USD',
+      where: 'Stripe Dashboard → Settings → Payments',
+      why: 'Every amount is created in this currency.',
+      secret: false },
+    { key: 'descriptor', label: 'Statement descriptor', group: 'Account', required: true,
+      placeholder: 'FLEETSQUAD',
+      where: 'Stripe Dashboard → Settings → Public details → Statement descriptor',
+      why: 'What the customer sees on their card statement. Keeps chargebacks down.',
+      secret: false },
+    { key: 'connectClientId', label: 'Connect client ID', group: 'Mechanic payouts', required: false,
+      placeholder: 'ca_…',
+      where: 'Stripe Dashboard → Connect → Settings → Integration',
+      why: 'Only needed if mechanics are to be paid through Stripe Connect rather than outside the platform.',
+      secret: false },
+    { key: 'taxId', label: 'Business EIN / tax ID', group: 'Mechanic payouts', required: false,
+      placeholder: '00-0000000',
+      where: 'Your business records — entered once in Stripe',
+      why: 'Required by Stripe before payouts to technicians can be enabled.',
+      secret: true }
+  ];
+
+  /* Everything else the integration needs, but that is configuration rather
+     than a credential. Shown as a checklist next to the key fields. */
+  D.stripeChecklist = [
+    'Turn on the "payment_intent.succeeded", "payment_intent.payment_failed" and "charge.refunded" webhook events.',
+    'Point the webhook endpoint at https://fleetsquad.com/api/stripe/webhook once the server is live.',
+    'Enable Payment Links in the Stripe dashboard so invoices can be sent from a project.',
+    'Add the cards you want to accept (Visa, Mastercard, Amex, Discover) plus ACH if fleets will pay by bank.',
+    'Verify the business and add a bank account so Stripe can pay out to FleetSquad.',
+    'Keep a test-mode key pair as well — the staging site runs on pk_test / sk_test.'
   ];
 })(window);

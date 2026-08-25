@@ -110,19 +110,6 @@
     }).join('');
   }
 
-  function renderIndustries() {
-    var host = document.getElementById('industriesGrid');
-    if (!host) return;
-    host.innerHTML = D.industries.map(function (i) {
-      return '<a class="tile" href="' + FS.url('industry.html?i=' + i.slug) + '">' +
-        '<span class="kpi-icon kpi-icon--navy mb-3">' + FS.icon(i.icon) + '</span>' +
-        '<h3>' + FS.esc(i.name) + '</h3>' +
-        '<p>' + FS.esc(i.excerpt) + '</p>' +
-        '<span class="tile-link">Explore' + FS.icon('arrow-right') + '</span>' +
-      '</a>';
-    }).join('');
-  }
-
   /* ------------------------------------------------------------------------
      Reviews: aggregate rating + three featured testimonials
      ------------------------------------------------------------------------ */
@@ -172,7 +159,8 @@
   function renderBlog() {
     var host = document.getElementById('blogPreview');
     if (!host) return;
-    host.innerHTML = D.posts.slice(0, 3).map(function (p) {
+    // Published articles only, newest first — matches the admin blog list.
+    host.innerHTML = Store.posts('published').slice(0, 3).map(function (p) {
       return '<a class="post-card" href="' + FS.url('blog-post.html?p=' + p.slug) + '">' +
         '<div class="post-media">' +
           '<img src="' + FS.url(p.image) + '" alt="" loading="lazy">' +
@@ -218,17 +206,47 @@
         out.textContent = 'Enter a 5-digit zip code.';
         return;
       }
+      // The zip resolves to a city, then the city is checked against the
+      // coverage the admin maintains in Service Areas.
       var hit = D.zipLookup[zip];
-      if (hit) {
+      if (!hit) {
+        var keys = Object.keys(D.zipLookup);
+        hit = D.zipLookup[keys[Number(zip) % keys.length]];
+      }
+      var area = Store.lookupArea(hit.city) || Store.lookupArea(hit.state);
+
+      if (area) {
         out.className = 'hint text-ok text-semi';
         out.textContent = 'Good news — we service ' + hit.city + ', ' + hit.state + '.';
       } else {
-        // Unknown zips still resolve, so the demo always has something to show.
-        var keys = Object.keys(D.zipLookup);
-        var near = D.zipLookup[keys[Number(zip) % keys.length]];
-        out.className = 'hint text-ok text-semi';
-        out.textContent = 'We cover this area — nearest hub: ' + near.city + ', ' + near.state + '.';
+        out.className = 'hint text-semi';
+        out.textContent = 'We do not cover ' + hit.city + ', ' + hit.state +
+          ' yet — call 1-888-391-MECH and we will find you a tech.';
       }
+    });
+  }
+
+  /* ------------------------------------------------------------------------
+     Dashboard preview gate
+     The homepage widget only shows sample figures, so both of its controls —
+     the range picker and "View Full Dashboard" — send a signed-out visitor to
+     the login screen. Someone already signed in lands on their own portal.
+     ------------------------------------------------------------------------ */
+  function wireDashboardGate() {
+    var gates = FS.$$('[data-dash-gate]');
+    if (!gates.length) return;
+
+    gates.forEach(function (node) {
+      node.addEventListener('click', function (e) {
+        e.preventDefault();
+        var session = Store.session();
+        if (session) {
+          var home = (FS.data.users.filter(function (u) { return u.role === session.role; })[0] || {}).home;
+          window.location.href = FS.url(home || 'login.html');
+        } else {
+          window.location.href = FS.url('login.html?next=dashboard');
+        }
+      });
     });
   }
 
@@ -239,11 +257,11 @@
     renderServices();
     renderWhy();
     renderVehicles();
-    renderIndustries();
     renderReviews();
     renderBlog();
     renderMiniKpis();
     wireZipCheck();
+    wireDashboardGate();
     FS.hydrateIcons(document);
   }
 

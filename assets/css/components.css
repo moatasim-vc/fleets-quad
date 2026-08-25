@@ -229,6 +229,9 @@
   background-size: 17px;
 }
 
+/* A button that has to read as a select (the gated homepage range picker). */
+.select-btn { text-align: left; cursor: pointer; }
+
 .hint { margin-top: 6px; font-size: var(--fs-xs); color: var(--ink-400); }
 .error-text { margin-top: 6px; font-size: var(--fs-xs); color: var(--danger); font-weight: 600; }
 .input.is-error, .select.is-error, .textarea.is-error { border-color: var(--danger); }
@@ -803,3 +806,16 @@ body.modal-open { overflow: hidden; }
 }
 .ref-badge small { font-size: var(--fs-xs); text-transform: uppercase; letter-spacing: .1em; color: rgba(255, 255, 255, .6); font-weight: 700; }
 .ref-badge strong { font-size: 1.6rem; letter-spacing: .02em; font-family: var(--font-mono); }
+
+/* Coverage card highlighted by the "check your area" lookup. */
+.area-card.is-hit {
+  border-color: var(--blue-600);
+  box-shadow: 0 0 0 3px var(--blue-050);
+}
+
+/* Inline "read next" list inside an article body. */
+.inline-links { display: grid; gap: 8px; }
+.inline-links li { display: flex; gap: 9px; }
+.inline-links li::before { content: "→"; color: var(--blue-600); flex: none; }
+.inline-links a { color: var(--blue-600); font-weight: 600; }
+.inline-links a:hover { text-decoration: underline; }

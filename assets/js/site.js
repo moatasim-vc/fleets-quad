@@ -16,12 +16,20 @@
   /* ------------------------------------------------------------------------
      Brand lockup
      ------------------------------------------------------------------------ */
-  function brand(dark) {
-    return '<a class="brand' + (dark ? ' brand--dark' : '') + '" href="' + FS.url('index.html') + '" aria-label="FleetSquad home">' +
+  /**
+   * The wordmark is two words, not one: "FLEET" stays white (navy on light
+   * surfaces) and "SQUAD" carries the blue.
+   * @param {boolean} [dark]  render for a light background
+   * @param {string}  [extra] extra class names for the anchor
+   * @param {boolean} [noTag] drop the "Mobile Fleet Maintenance" strapline
+   */
+  function brand(dark, extra, noTag) {
+    return '<a class="brand' + (dark ? ' brand--dark' : '') + (extra ? ' ' + extra : '') +
+      '" href="' + FS.url('index.html') + '" aria-label="FleetSquad home">' +
       '<img class="brand-mark" src="' + FS.url('assets/img/logo-shield.png') + '" alt="" width="256" height="416">' +
       '<span class="brand-text">' +
-        '<span class="brand-word">FLEETS<i>QUAD</i></span>' +
-        '<span class="brand-tag">Mobile<br>Fleet Maintenance</span>' +
+        '<span class="brand-word">FLEET<i>SQUAD</i></span>' +
+        (noTag ? '' : '<span class="brand-tag">Mobile<br>Fleet Maintenance</span>') +
       '</span>' +
     '</a>';
   }
@@ -74,19 +82,23 @@
       '</div>';
     }).join('');
 
+    /* Layout follows the client's "navi bar updates" reference: the lockup and
+       the phone number stack centred at the top, Get Estimate sits directly
+       beneath them, the five groups run as divided accordions, and Login is
+       pinned to the bottom. */
     return '<div class="drawer-scrim" data-drawer-close></div>' +
       '<aside class="drawer" id="fs-drawer" aria-label="Site menu">' +
         '<div class="drawer-head">' +
-          brand() +
           '<button class="drawer-close" data-drawer-close aria-label="Close menu">' + FS.icon('close') + '</button>' +
+          brand(false, 'brand--drawer', true) +
+          '<a class="drawer-phone" href="tel:' + C.phoneRaw + '">' + FS.esc(C.phone) + '</a>' +
         '</div>' +
         '<div class="drawer-body">' +
-          '<a class="btn btn-primary btn-block" href="' + FS.url('get-estimate.html') + '">Get Estimate</a>' +
-          '<div class="mt-4">' + groups + '</div>' +
+          '<a class="btn btn-primary btn-block btn-lg" href="' + FS.url('get-estimate.html') + '">Get Estimate</a>' +
+          '<div class="drawer-groups">' + groups + '</div>' +
         '</div>' +
         '<div class="drawer-foot">' +
           '<a class="btn btn-outline-light btn-block" href="' + FS.url('login.html') + '">Login</a>' +
-          '<a class="drawer-call" href="tel:' + C.phoneRaw + '">' + FS.icon('phone') + FS.esc(C.phone) + '</a>' +
         '</div>' +
       '</aside>';
   }

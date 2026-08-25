@@ -218,10 +218,11 @@
         (v.notes ? '<div class="alert alert--info mb-5">' + FS.icon('file-text') +
           '<div><strong>Technician notes</strong><br>' + FS.esc(v.notes) + '</div></div>' : '') +
 
+        /* Times are shown in 12-hour format with AM/PM, never military. */
         '<div class="clock-strip mb-5">' +
-          '<div class="clock-cell"><small>Clock In</small><strong>' + FS.esc(v.clockIn || '—') + '</strong></div>' +
-          '<div class="clock-cell"><small>Clock Out</small><strong>' + FS.esc(v.clockOut || '—') + '</strong></div>' +
-          '<div class="clock-cell"><small>Total Hours</small><strong>' + (v.hours ? v.hours + ' h' : '—') + '</strong></div>' +
+          '<div class="clock-cell"><small>Clock In</small><strong>' + FS.esc(FS.time12(v.clockIn)) + '</strong></div>' +
+          '<div class="clock-cell"><small>Clock Out</small><strong>' + FS.esc(FS.time12(v.clockOut)) + '</strong></div>' +
+          '<div class="clock-cell"><small>Total Hours</small><strong>' + FS.esc(FS.duration(v.hours)) + '</strong></div>' +
           '<div class="clock-cell"><small>Images</small><strong>' + totalImages + '</strong></div>' +
         '</div>' +
 
@@ -576,6 +577,77 @@
     });
   };
 
+  /**
+   * Close a project out as paid without running a card — for the jobs settled
+   * in cash, by cheque or by bank transfer. The project can have been assigned
+   * and worked long before this happens.
+   */
+  Dash.markPaidModal = function (order, done) {
+    if (order.payment === 'paid') {
+      FS.toast('Already paid', 'Project ' + order.id + ' is settled.', 'info');
+      return;
+    }
+    var total = Store.orderTotal(order);
+    var already = Store.payments()
+      .filter(function (p) { return p.orderId === order.id && p.status === 'succeeded' && p.type !== 'refund'; })
+      .reduce(function (s, p) { return s + p.amount; }, 0);
+    var outstanding = Math.max(0, total - already);
+
+    FS.modal({
+      title: 'Mark project fully paid',
+      subtitle: order.id,
+      body:
+        '<div class="money-row"><span>Project total</span><strong>' + FS.money(total, true) + '</strong></div>' +
+        '<div class="money-row"><span>Recorded so far</span><strong>' + FS.money(already, true) + '</strong></div>' +
+        '<div class="money-row money-row--total"><span>Outstanding</span><strong>' + FS.money(outstanding, true) + '</strong></div>' +
+        '<form id="mpForm" class="mt-6" novalidate>' +
+          '<div class="field"><label class="label" for="mpAmount">Amount received ($) <span class="req">*</span></label>' +
+            '<input class="input" id="mpAmount" name="amount" type="number" step="0.01" value="' + outstanding + '" required></div>' +
+          '<div class="field"><label class="label" for="mpMethod">How was it paid?</label>' +
+            '<select class="select" id="mpMethod" name="method">' +
+              '<option>Cash</option><option>Check</option><option>Bank transfer / ACH</option>' +
+              '<option>Card taken over the phone</option><option>Paid on a Stripe link</option><option>Other</option>' +
+            '</select></div>' +
+          '<div class="field"><label class="label" for="mpRef">Reference / note</label>' +
+            '<input class="input" id="mpRef" name="note" placeholder="Check number, transfer reference…"></div>' +
+        '</form>' +
+        '<div class="alert alert--info mt-4">' + FS.icon('info') +
+          '<div>The project is flagged Paid, the customer is notified, and the amount appears in Payments.</div></div>',
+      footer: '<button class="btn btn-outline" data-close>Cancel</button>' +
+              '<button class="btn btn-success" id="mpGo">' + FS.icon('check-circle') + 'Mark fully paid</button>',
+      onMount: function (root, close) {
+        root.querySelector('#mpGo').addEventListener('click', function () {
+          var form = root.querySelector('#mpForm');
+          if (!FS.validate(form)) return;
+          var f = FS.formData(form);
+          var amount = Number(f.amount) || 0;
+          var who = (FS.shell && FS.shell.session) ? FS.shell.session.name : 'Admin';
+
+          Store.addPayment({
+            orderId: order.id, customerId: order.customerId, amount: amount,
+            method: f.method + (f.note ? ' · ' + f.note : ''), type: 'charge', status: 'succeeded'
+          });
+          Store.updateOrder(order.id, {
+            payment: 'paid',
+            // Only a project that is finished in the yard moves to Completed.
+            status: order.status === 'waiting-payment' ? 'completed' : order.status
+          }, { who: who, text: 'Marked fully paid — ' + FS.money(amount, true) + ' by ' + f.method });
+
+          Store.notify({
+            channel: 'email', audience: 'customer', orderId: order.id,
+            title: 'Payment received for ' + order.id,
+            body: 'We have recorded ' + FS.money(amount, true) + ' against project ' + order.id +
+                  ' (' + f.method + '). Your balance is now zero. Thank you.'
+          });
+
+          close();
+          FS.toast('Project marked paid', order.id + ' · ' + FS.money(amount, true), 'ok');
+          if (done) done();
+        });
+      }
+    });
+  };
+
   Dash.payoutModal = function (order, done) {
     var suggested = order.mechanicPayout || Math.round(order.laborTotal * 0.45);
     var mech = Store.mechanic(order.mechanicId);
@@ -619,6 +691,272 @@
         });
       }
     });
+  };
+
+  /* ------------------------------------------------------------------------
+     Notification inbox
+     Shared by all four portals, so it lives here rather than in admin.js —
+     the manager, customer and technician pages never load that file.
+     ------------------------------------------------------------------------ */
+
+  Dash.notificationsView = function (mount, audience, lead) {
+    render();
+
+    function render() {
+      var list = Store.notifications(audience);
+      mount.innerHTML =
+        '<div class="page-head"><div><h2>Notifications</h2><p>' + FS.esc(lead) + '</p></div>' +
+          '<div class="page-head-actions">' +
+            '<button class="btn btn-outline" id="markAll">' + FS.icon('check') + 'Mark all read</button>' +
+          '</div></div>' +
+
+        '<div class="card"><div class="card-head">' +
+          '<h3>Inbox <span class="badge badge--info">' + Store.unreadCount(audience) + ' unread</span></h3>' +
+          '<span class="text-sm text-muted">' + list.length + ' total</span></div>' +
+          (list.length ? list.map(function (n) {
+            return '<div class="note-item' + (n.read ? '' : ' is-unread') + '">' +
+              '<span class="note-channel note-channel--' + n.channel + '">' +
+                FS.icon(n.channel === 'sms' ? 'message' : 'mail') + '</span>' +
+              '<div class="note-body"><strong>' + FS.esc(n.title) + '</strong>' +
+                '<p>' + FS.esc(n.body) + '</p>' +
+                (n.orderId ? '<a class="text-xs text-blue text-bold" href="' +
+                  FS.url(audience + '/' + (audience === 'admin' ? 'order-details' :
+                         audience === 'mechanic' ? 'job-details' : 'project-details') + '.html?id=' + n.orderId) +
+                  '">Open ' + FS.esc(n.orderId) + '</a>' : '') +
+              '</div>' +
+              '<span class="note-time">' + FS.ago(n.at) + '</span>' +
+            '</div>';
+          }).join('') : '<div class="empty-state">' + FS.icon('bell') +
+            '<h4>Inbox zero</h4><p>No notifications for this role yet.</p></div>') +
+        '</div>';
+
+      mount.querySelector('#markAll').addEventListener('click', function () {
+        Store.markAllRead(audience);
+        FS.toast('All caught up', '', 'ok');
+        render();
+      });
+      FS.hydrateIcons(mount);
+    }
+  };
+
+  /* ------------------------------------------------------------------------
+     User directory
+     Shared by the admin and manager portals. Tabs across the four account
+     types, newest account at the top, and a row-level "impersonate" /
+     "reset password" pair. Used by admin/users.html and manager/users.html.
+     ------------------------------------------------------------------------ */
+
+  var USER_TABS = [
+    { key: 'all',      label: 'All Users' },
+    { key: 'customer', label: 'Customers' },
+    { key: 'mechanic', label: 'Mechanics' },
+    { key: 'manager',  label: 'Managers' },
+    { key: 'admin',    label: 'Admins' }
+  ];
+
+  var ROLE_HOME = {
+    admin: 'admin/index.html', manager: 'manager/index.html',
+    customer: 'customer/index.html', mechanic: 'mechanic/index.html'
+  };
+
+  Dash.usersView = function (mount, opts) {
+    opts = opts || {};
+    var actor = (FS.shell && FS.shell.session) ? FS.shell.session.name : 'Admin';
+    var state = { tab: FS.param('type', 'all'), q: '' };
+
+    render();
+
+    function render() {
+      var all = Store.directory();
+      var list = state.tab === 'all' ? all : all.filter(function (p) { return p.role === state.tab; });
+
+      if (state.q) {
+        var q = state.q.toLowerCase();
+        list = list.filter(function (p) {
+          return [p.name, p.email, p.phone, p.city, p.state, p.company, p.type]
+            .join(' ').toLowerCase().indexOf(q) > -1;
+        });
+      }
+
+      mount.innerHTML =
+        '<div class="page-head"><div><h2>Users</h2>' +
+          '<p>' + list.length + ' account' + (list.length === 1 ? '' : 's') +
+          ' — newest at the top. Open any portal as that user, or send them a password reset.</p></div></div>' +
+
+        Dash.kpiGrid([
+          { icon: 'briefcase', tone: 'navy', label: 'Customers', value: all.filter(byRole('customer')).length },
+          { icon: 'wrench',    tone: 'ok',   label: 'Mechanics', value: all.filter(byRole('mechanic')).length },
+          { icon: 'users',                   label: 'Managers',  value: all.filter(byRole('manager')).length },
+          { icon: 'shield-badge',            label: 'Admins',    value: all.filter(byRole('admin')).length }
+        ], 'kpi-grid--4') +
+
+        '<div class="table-wrap">' +
+          '<div class="toolbar"><div class="input-icon">' + FS.icon('search') +
+            '<input class="input" id="userSearch" placeholder="Search name, email, phone or city…" ' +
+            'value="' + FS.esc(state.q) + '"></div></div>' +
+          '<div class="toolbar" style="padding-block:10px"><div class="filters">' +
+            USER_TABS.map(function (t) {
+              return '<button class="filter-pill' + (t.key === state.tab ? ' is-active' : '') +
+                '" data-utab="' + t.key + '">' + t.label + '</button>';
+            }).join('') +
+          '</div></div>' +
+
+          (list.length
+            ? '<div class="scroll-x"><table class="table table--stack"><thead><tr>' +
+                '<th>Name</th><th>Type</th><th>Email</th><th>Phone</th><th>City / State</th>' +
+                '<th>Joined</th><th class="td-actions">Actions</th></tr></thead><tbody>' +
+              list.map(row).join('') +
+              '</tbody></table></div>'
+            : '<div class="table-empty">' + FS.icon('search') +
+              '<p class="mt-3">No users match this filter.</p></div>') +
+        '</div>';
+
+      wire();
+    }
+
+    function byRole(r) { return function (p) { return p.role === r; }; }
+
+    function row(p) {
+      var tone = { customer: 'info', mechanic: 'ok', manager: 'warn', admin: 'neutral' }[p.role];
+      return '<tr>' +
+        '<td data-label="Name"><div class="row"><span class="avatar avatar--sm">' + FS.initials(p.name) + '</span>' +
+          '<span style="min-width:0"><span class="td-strong" style="display:block">' + FS.esc(p.name) + '</span>' +
+          '<small class="text-xs text-dim">' + FS.esc(p.company) + '</small></span></div></td>' +
+        '<td data-label="Type"><span class="badge badge--' + tone + '">' + FS.esc(p.type) + '</span></td>' +
+        '<td data-label="Email"><a class="text-blue" href="mailto:' + FS.esc(p.email) + '">' + FS.esc(p.email) + '</a></td>' +
+        '<td data-label="Phone"><a href="tel:' + FS.esc(String(p.phone).replace(/[^\d+]/g, '')) + '">' + FS.esc(p.phone) + '</a></td>' +
+        '<td data-label="City / State">' + FS.esc(p.city + ', ' + p.state) + '</td>' +
+        '<td data-label="Joined">' + (p.since ? FS.date(p.since) : '—') + '</td>' +
+        '<td class="td-actions" data-label="Actions">' +
+          '<button class="btn btn-xs btn-outline" data-uview="' + FS.esc(p.key) + '">' + FS.icon('eye') + 'Details</button> ' +
+          '<button class="btn btn-xs btn-outline" data-ureset="' + FS.esc(p.key) + '">' + FS.icon('lock') + 'Reset password</button> ' +
+          (p.role === 'admin' ? '' :
+            '<button class="btn btn-xs btn-dark" data-uimp="' + FS.esc(p.key) + '">' + FS.icon('user') + 'Impersonate</button>') +
+        '</td>' +
+      '</tr>';
+    }
+
+    function wire() {
+      var search = mount.querySelector('#userSearch');
+      var timer;
+      search.addEventListener('input', function () {
+        clearTimeout(timer);
+        timer = setTimeout(function () {
+          state.q = search.value;
+          render();
+          var again = mount.querySelector('#userSearch');
+          again.focus();
+          again.setSelectionRange(again.value.length, again.value.length);
+        }, 200);
+      });
+
+      FS.$$('[data-utab]', mount).forEach(function (b) {
+        b.addEventListener('click', function () { state.tab = b.dataset.utab; render(); });
+      });
+
+      FS.$$('[data-uview]', mount).forEach(function (b) {
+        b.addEventListener('click', function () { detailModal(Store.person(b.dataset.uview)); });
+      });
+
+      FS.$$('[data-ureset]', mount).forEach(function (b) {
+        b.addEventListener('click', function () { resetModal(Store.person(b.dataset.ureset)); });
+      });
+
+      FS.$$('[data-uimp]', mount).forEach(function (b) {
+        b.addEventListener('click', function () { impersonate(Store.person(b.dataset.uimp)); });
+      });
+
+      FS.hydrateIcons(mount);
+    }
+
+    /* --- Details ------------------------------------------------------- */
+    function detailModal(p) {
+      if (!p) return;
+      var orders = p.role === 'customer' ? Store.ordersFor('customer', p.refId)
+                 : p.role === 'mechanic' ? Store.ordersFor('mechanic', p.refId)
+                 : p.role === 'manager'  ? Store.ordersFor('manager', p.refId)
+                 : Store.orders();
+
+      FS.modal({
+        title: p.name,
+        subtitle: p.type + ' · ' + p.company,
+        size: 'lg',
+        body:
+          '<dl class="dl dl--2 mb-6">' +
+            d('Email', p.email) + d('Phone', p.phone) +
+            d('City', p.city) + d('State', p.state) +
+            d('Account type', p.type) + d('Joined', p.since ? FS.date(p.since, 'long') : '—') +
+            d('Portal username', p.email) + d('Reference ID', p.refId || '—') +
+          '</dl>' +
+          '<h4 class="mb-3">Projects (' + orders.length + ')</h4>' +
+          (orders.length
+            ? '<div class="scroll-x"><table class="table table--compact"><tbody>' +
+              orders.slice(0, 8).map(function (o) {
+                return '<tr><td class="td-strong">' + FS.esc(o.id) + '</td>' +
+                  '<td>' + FS.esc(o.serviceType) + '</td>' +
+                  '<td>' + Dash.statusBadge(o.status) + '</td>' +
+                  '<td class="text-right td-strong">' + FS.money(Store.orderTotal(o)) + '</td></tr>';
+              }).join('') + '</tbody></table></div>'
+            : '<p class="text-dim">No projects yet.</p>'),
+        footer: '<button class="btn btn-outline" data-close>Close</button>' +
+          '<button class="btn btn-outline" id="udReset">' + FS.icon('lock') + 'Reset password</button>' +
+          (p.role === 'admin' ? '' : '<button class="btn btn-primary" id="udImp">' + FS.icon('user') + 'Impersonate</button>'),
+        onMount: function (root, close) {
+          root.querySelector('#udReset').addEventListener('click', function () { close(); resetModal(p); });
+          var imp = root.querySelector('#udImp');
+          if (imp) imp.addEventListener('click', function () { close(); impersonate(p); });
+        }
+      });
+
+      function d(k, v) { return '<div><dt>' + FS.esc(k) + '</dt><dd>' + FS.esc(v == null ? '—' : v) + '</dd></div>'; }
+    }
+
+    /* --- Password reset ------------------------------------------------ */
+    function resetModal(p) {
+      if (!p) return;
+      FS.confirm('Reset password for ' + p.name + '?',
+        'A new temporary password is generated and emailed to ' + p.email +
+        '. Their current password stops working straight away.',
+        function () {
+          var out = Store.resetPassword(p.key, actor);
+          FS.modal({
+            title: 'Password reset sent',
+            subtitle: p.name + ' · ' + p.email,
+            body:
+              '<div class="creds mb-5">' +
+                '<div class="creds-row"><small>Portal</small><code>fleetsquad.com/login</code></div>' +
+                '<div class="creds-row"><small>Username</small><code>' + FS.esc(p.email) + '</code></div>' +
+                '<div class="creds-row"><small>Temporary password</small><code>' + FS.esc(out.password) + '</code></div>' +
+              '</div>' +
+              '<div class="msg-preview">' +
+                '<div class="msg-preview-head">' + FS.icon('mail') + 'Email sent to ' + FS.esc(p.email) + '</div>' +
+                '<div class="msg-preview-body">Subject: Reset your FleetSquad password\n\n' +
+                'Hi ' + FS.esc(p.name) + ',\n' + FS.esc(actor) + ' at FleetSquad reset your password.\n' +
+                'Sign in at fleetsquad.com/login with:\n' +
+                'Username: ' + FS.esc(p.email) + '\n' +
+                'Temporary password: ' + FS.esc(out.password) + '\n\n' +
+                'You will be asked to choose a new password on first sign-in.</div>' +
+              '</div>' +
+              '<p class="hint mt-4">The password is shown here so you can read it back if the email bounces. ' +
+              'It also appears in the ' + FS.esc(p.type.toLowerCase()) + ' notification inbox.</p>',
+            footer: '<button class="btn btn-primary" data-close>Done</button>'
+          });
+          FS.toast('Password reset', p.email + ' notified.', 'ok');
+          render();
+        });
+    }
+
+    /* --- Impersonation -------------------------------------------------- */
+    function impersonate(p) {
+      if (!p) return;
+      FS.confirm('Open the portal as ' + p.name + '?',
+        'You will see exactly what this ' + p.type.toLowerCase() + ' sees. ' +
+        'A banner stays on screen until you switch back to your own account.',
+        function () {
+          Store.impersonate(p.key);
+          window.location.href = FS.url(ROLE_HOME[p.role]);
+        });
+    }
   };
 
   /* Small string hash used to fabricate stable-looking payment link ids. */

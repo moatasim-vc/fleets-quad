@@ -3,12 +3,28 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>FleetSquad — Mobile Fleet Maintenance &amp; Repair | ASE Master Techs</title>
-<meta name="description" content="FleetSquad brings mobile ASE Master Techs to your location. Preventive maintenance, mobile fleet repair, diagnostics, emergency roadside and inspections — we come to you.">
-<link rel="icon" href="assets/img/logo-shield.png">
+<title>Mobile Fleet Maintenance &amp; Repair | FleetSquad</title>
+<meta name="description" content="FleetSquad brings mobile ASE Master Techs to your yard, terminal or job site. Preventive maintenance, mobile fleet repair, diagnostics, emergency roadside and DOT inspections.">
+<meta name="keywords" content="mobile fleet maintenance, mobile fleet repair, fleet mechanic, ase master techs, mobile diesel mechanic, fleet preventive maintenance">
+<meta name="robots" content="index,follow">
+<link rel="canonical" href="https://www.fleetsquad.com/">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="FleetSquad">
+<meta property="og:title" content="Mobile Fleet Maintenance &amp; Repair | FleetSquad">
+<meta property="og:description" content="FleetSquad brings mobile ASE Master Techs to your yard, terminal or job site. Preventive maintenance, mobile fleet repair, diagnostics, emergency roadside and DOT inspections.">
+<meta property="og:url" content="https://www.fleetsquad.com/">
+<meta property="og:image" content="https://www.fleetsquad.com/assets/img/hero-fleet-desktop.jpg">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Mobile Fleet Maintenance &amp; Repair | FleetSquad">
+<meta name="twitter:description" content="FleetSquad brings mobile ASE Master Techs to your yard, terminal or job site. Preventive maintenance, mobile fleet repair, diagnostics, emergency roadside and DOT inspections.">
+<meta name="twitter:image" content="https://www.fleetsquad.com/assets/img/hero-fleet-desktop.jpg">
+<link rel="icon" href="favicon.ico" sizes="any">
+<link rel="icon" type="image/png" sizes="32x32" href="assets/img/favicon-32.png">
+<link rel="icon" type="image/png" sizes="16x16" href="assets/img/favicon-16.png">
+<link rel="apple-touch-icon" sizes="180x180" href="assets/img/favicon-180.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700;800&amp;display=swap" rel="stylesheet">
 <link rel="stylesheet" href="assets/css/variables.css">
 <link rel="stylesheet" href="assets/css/base.css">
 <link rel="stylesheet" href="assets/css/components.css">
@@ -137,14 +153,13 @@
           <h3>Fleet Dashboard</h3>
           <div class="row-between mb-4">
             <strong style="font-size:19px;color:var(--ink-900)">Overview</strong>
-            <select class="select" id="dashRange" style="width:auto" aria-label="Date range">
-              <option>This Month</option>
-              <option>Last Month</option>
-              <option>This Quarter</option>
-            </select>
+            <!-- Both controls are gated: a signed-out visitor is sent to the
+                 login screen, a signed-in one goes straight to their portal.
+                 See wireDashboardGate() in home.js. -->
+            <button class="select select-btn" type="button" id="dashRange" data-dash-gate style="width:auto">This Month</button>
           </div>
           <div class="mini-kpis" id="miniKpis"><!-- rendered by home.js --></div>
-          <a class="btn btn-primary btn-block mt-4" href="login.html">View Full Dashboard</a>
+          <a class="btn btn-primary btn-block mt-4" id="dashFull" data-dash-gate href="login.html">View Full Dashboard</a>
         </div>
 
       </div>
@@ -172,19 +187,6 @@
           <p>Whether you run trucks, vans, pickups, or cars&mdash;we keep them all moving.</p>
           <div class="vehicles-grid" id="vehiclesGrid"><!-- rendered by home.js --></div>
         </div>
-      </div>
-    </section>
-
-    <!-- ==================================================================
-         Industries served
-         ================================================================== -->
-    <section class="section" style="padding-top:0">
-      <div class="container">
-        <div class="section-head">
-          <h2>Industries We Serve</h2>
-          <p>Purpose-built maintenance programmes for the way each industry actually runs.</p>
-        </div>
-        <div class="grid grid-3" id="industriesGrid"><!-- rendered by home.js --></div>
       </div>
     </section>
 

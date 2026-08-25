@@ -10,23 +10,40 @@
   'use strict';
 
   var FS = window.FS = window.FS || {};
-  var KEY = 'fleetsquad.state.v1';
+  var KEY = 'fleetsquad.state.v2';
 
   /* ------------------------------------------------------------------------
      Load / persist
      ------------------------------------------------------------------------ */
 
+  function clone(x) { return JSON.parse(JSON.stringify(x)); }
+
   function seed() {
+    /* Credentials live beside the people records so an admin password reset
+       has something real to change. Everything is local to this browser. */
+    var credentials = {};
+    FS.data.users.forEach(function (u) { credentials[u.email.toLowerCase()] = u.password; });
+    FS.data.customers.forEach(function (c) { credentials[c.email.toLowerCase()] = 'demo1234'; });
+    FS.data.mechanics.forEach(function (m) { credentials[m.email.toLowerCase()] = 'demo1234'; });
+    FS.data.managers.forEach(function (m) { credentials[m.email.toLowerCase()] = 'demo1234'; });
+
     return {
-      orders:        JSON.parse(JSON.stringify(FS.data.orders)),
-      customers:     JSON.parse(JSON.stringify(FS.data.customers)),
-      mechanics:     JSON.parse(JSON.stringify(FS.data.mechanics)),
-      reviews:       JSON.parse(JSON.stringify(FS.data.reviews)),
-      notifications: JSON.parse(JSON.stringify(FS.data.notifications)),
-      payments:      JSON.parse(JSON.stringify(FS.data.payments)),
-      payouts:       JSON.parse(JSON.stringify(FS.data.payouts)),
+      orders:        clone(FS.data.orders),
+      customers:     clone(FS.data.customers),
+      mechanics:     clone(FS.data.mechanics),
+      managers:      clone(FS.data.managers),
+      reviews:       clone(FS.data.reviews),
+      notifications: clone(FS.data.notifications),
+      payments:      clone(FS.data.payments),
+      payouts:       clone(FS.data.payouts),
+      posts:         clone(FS.data.posts),
+      serviceAreas:  clone(FS.data.serviceAreas),
+      cmsPages:      clone(FS.data.cmsPages),
+      credentials:   credentials,
+      settings:      { stripe: {}, stripeMode: 'test', stripeConnected: false },
       estimates:     [],
       session:       null,
+      impersonator:  null,
       nextProject:   1233,
       nextCustomer:  1009
     };
@@ -37,7 +54,7 @@
     var raw = window.localStorage.getItem(KEY);
     state = raw ? JSON.parse(raw) : seed();
     // A missing collection means the seed shape changed — start clean.
-    if (!state.orders || !state.customers) state = seed();
+    if (!state.orders || !state.customers || !state.posts || !state.serviceAreas) state = seed();
   } catch (e) {
     state = seed();
   }
@@ -67,13 +84,68 @@
       var user = FS.data.users.filter(function (u) { return u.role === role; })[0];
       if (!user) return null;
       state.session = { role: user.role, name: user.name, email: user.email, refId: user.refId, title: user.title };
+      state.impersonator = null;
       persist();
       return state.session;
     },
 
-    logout: function () { state.session = null; persist(); },
+    /**
+     * Sign in with an email + password pair. Any account in the directory
+     * works, so an admin can hand a customer or a technician their own login.
+     * @returns {{ok:boolean, session?:object, error?:string}}
+     */
+    authenticate: function (email, password) {
+      email = String(email || '').trim().toLowerCase();
+      if (!email) return { ok: false, error: 'Enter your email address.' };
+
+      var stored = state.credentials[email];
+      if (stored == null) return { ok: false, error: 'We do not recognise that email address.' };
+      if (password !== stored) return { ok: false, error: 'That password is not correct.' };
+
+      var person = Store.directory().filter(function (p) { return p.email.toLowerCase() === email; })[0];
+      if (!person) return { ok: false, error: 'That account has no portal access yet.' };
+
+      state.session = {
+        role: person.role, name: person.name, email: person.email,
+        refId: person.refId, title: person.title
+      };
+      state.impersonator = null;
+      persist();
+      return { ok: true, session: state.session };
+    },
+
+    logout: function () { state.session = null; state.impersonator = null; persist(); },
 
     session: function () { return state.session; },
+
+    /* ----------------------------------------------------------------------
+       Impersonation — an admin or manager opens the portal as another user.
+       The original session is parked so it can be restored in one click.
+       ---------------------------------------------------------------------- */
+
+    impersonate: function (personKey) {
+      var person = Store.directory().filter(function (p) { return p.key === personKey; })[0];
+      if (!person) return null;
+      if (!state.impersonator && state.session) state.impersonator = state.session;
+      state.session = {
+        role: person.role, name: person.name, email: person.email,
+        refId: person.refId, title: person.title
+      };
+      persist();
+      return state.session;
+    },
+
+    isImpersonating: function () { return !!state.impersonator; },
+
+    impersonator: function () { return state.impersonator; },
+
+    stopImpersonating: function () {
+      if (!state.impersonator) return null;
+      state.session = state.impersonator;
+      state.impersonator = null;
+      persist();
+      return state.session;
+    },
 
     /** Redirect to the login screen when a dashboard page is opened cold. */
     requireRole: function (role) {
@@ -82,9 +154,233 @@
         // bouncing the visitor we sign them in as the role the page expects.
         Store.login(role);
       } else if (state.session.role !== role) {
-        Store.login(role);
+        // An impersonated session survives navigation inside the portal it was
+        // opened for; walking back into the impersonator's own area ends it.
+        if (state.impersonator && state.impersonator.role === role) Store.stopImpersonating();
+        else if (!state.impersonator) Store.login(role);
       }
       return state.session;
+    },
+
+    /* ----------------------------------------------------------------------
+       User directory — every person with portal access, newest account first.
+       ---------------------------------------------------------------------- */
+
+    directory: function (type) {
+      var list = [];
+
+      FS.data.users.filter(function (u) { return u.role === 'admin'; }).forEach(function (u) {
+        list.push({
+          key: 'ADM-' + u.email, role: 'admin', type: 'Admin', name: u.name, email: u.email,
+          phone: '(888) 391-6324', city: 'New York', state: 'NY', company: 'FleetSquad',
+          title: u.title, refId: null, since: null, sortAt: 0
+        });
+      });
+
+      (state.managers || []).forEach(function (m) {
+        list.push({
+          key: m.id, role: 'manager', type: 'Manager', name: m.name, email: m.email,
+          phone: m.phone, city: m.city || '—', state: m.state || '—', company: m.region + ' region',
+          title: 'Regional Fleet Manager', refId: m.id, since: m.since,
+          sortAt: m.since ? new Date(m.since).getTime() : 0
+        });
+      });
+
+      state.mechanics.forEach(function (m) {
+        list.push({
+          key: m.id, role: 'mechanic', type: 'Mechanic', name: m.name, email: m.email,
+          phone: m.phone, city: m.city, state: m.state, company: m.certs,
+          title: 'ASE Master Technician', refId: m.id, since: m.since,
+          sortAt: m.since ? new Date(m.since).getTime() : 0
+        });
+      });
+
+      state.customers.forEach(function (c) {
+        list.push({
+          key: c.id, role: 'customer', type: 'Customer', name: c.firstName + ' ' + c.lastName,
+          email: c.email, phone: c.phone, city: c.city, state: c.state, company: c.company,
+          title: c.company, refId: c.id, since: c.since,
+          sortAt: c.since ? new Date(c.since).getTime() : 0
+        });
+      });
+
+      // Newest account at the top, oldest at the bottom.
+      list.sort(function (a, b) { return b.sortAt - a.sortAt; });
+      return type ? list.filter(function (p) { return p.role === type; }) : list;
+    },
+
+    person: function (key) {
+      return Store.directory().filter(function (p) { return p.key === key; })[0] || null;
+    },
+
+    /**
+     * Issue a new temporary password and post the notification the customer or
+     * technician would receive. Returns the password so the admin can read it
+     * back to them if the email bounces.
+     */
+    resetPassword: function (personKey, who) {
+      var person = Store.person(personKey);
+      if (!person) return null;
+
+      var pwd = 'FS-' + Math.random().toString(36).slice(2, 8).toUpperCase();
+      state.credentials[person.email.toLowerCase()] = pwd;
+
+      Store.notify({
+        channel: 'email', audience: person.role, orderId: null,
+        title: 'Your FleetSquad password was reset',
+        body: 'Subject: Reset your FleetSquad password\n\n' +
+              'Hi ' + person.name + ',\n' +
+              (who ? who + ' at FleetSquad reset your password.\n' : '') +
+              'Sign in at fleetsquad.com/login with:\n' +
+              'Username: ' + person.email + '\n' +
+              'Temporary password: ' + pwd + '\n\n' +
+              'You will be asked to choose a new password on first sign-in.'
+      });
+      persist();
+      return { person: person, password: pwd };
+    },
+
+    setPassword: function (email, password) {
+      state.credentials[String(email).toLowerCase()] = password;
+      persist();
+    },
+
+    /* ----------------------------------------------------------------------
+       Blog posts
+       ---------------------------------------------------------------------- */
+
+    posts: function (status) {
+      var list = state.posts.slice().sort(function (a, b) { return new Date(b.at) - new Date(a.at); });
+      return status ? list.filter(function (p) { return p.status === status; }) : list;
+    },
+
+    post: function (slug) {
+      return state.posts.filter(function (p) { return p.slug === slug; })[0] || null;
+    },
+
+    savePost: function (slug, patch) {
+      var p = Store.post(slug);
+      if (!p) return null;
+      Object.assign(p, patch);
+      persist();
+      return p;
+    },
+
+    createPost: function (payload) {
+      var post = Object.assign({
+        slug: 'new-post-' + (state.posts.length + 1),
+        title: 'Untitled post',
+        category: FS.data.postCategories[0],
+        author: (state.session && state.session.name) || 'FleetSquad',
+        at: new Date().toISOString(),
+        read: 5,
+        image: 'assets/img/services/preventive-maintenance.jpg',
+        excerpt: '',
+        body: [''],
+        status: 'draft',
+        metaTitle: '',
+        metaDescription: '',
+        keywords: '',
+        related: []
+      }, payload);
+      state.posts.unshift(post);
+      persist();
+      return post;
+    },
+
+    deletePost: function (slug) {
+      state.posts = state.posts.filter(function (p) { return p.slug !== slug; });
+      // Drop the deleted slug from every remaining article's related list.
+      state.posts.forEach(function (p) {
+        p.related = (p.related || []).filter(function (s) { return s !== slug; });
+      });
+      persist();
+    },
+
+    /* ----------------------------------------------------------------------
+       Service areas
+       ---------------------------------------------------------------------- */
+
+    serviceAreas: function (activeOnly) {
+      var list = state.serviceAreas.slice().sort(function (a, b) {
+        return a.state.localeCompare(b.state);
+      });
+      return activeOnly ? list.filter(function (a) { return a.active; }) : list;
+    },
+
+    serviceArea: function (id) {
+      return state.serviceAreas.filter(function (a) { return a.id === id; })[0] || null;
+    },
+
+    saveServiceArea: function (id, patch) {
+      var a = Store.serviceArea(id);
+      if (!a) return null;
+      Object.assign(a, patch);
+      persist();
+      return a;
+    },
+
+    createServiceArea: function (payload) {
+      var n = state.serviceAreas.length + 1;
+      var area = Object.assign({
+        id: 'SA-' + (n < 10 ? '0' + n : n),
+        code: '', state: '', counties: [], cities: [], active: true
+      }, payload);
+      state.serviceAreas.push(area);
+      persist();
+      return area;
+    },
+
+    deleteServiceArea: function (id) {
+      state.serviceAreas = state.serviceAreas.filter(function (a) { return a.id !== id; });
+      persist();
+    },
+
+    /** Does a city / county / state string fall inside a covered area? */
+    lookupArea: function (query) {
+      var q = String(query || '').trim().toLowerCase();
+      if (!q) return null;
+      var hit = null;
+      Store.serviceAreas(true).some(function (a) {
+        var cityMatch = a.cities.filter(function (c) { return c.toLowerCase() === q; })[0];
+        var countyMatch = (a.counties || []).filter(function (c) { return c.toLowerCase() === q; })[0];
+        if (cityMatch || countyMatch || a.state.toLowerCase() === q || a.code.toLowerCase() === q) {
+          hit = { area: a, city: cityMatch || null, county: countyMatch || null };
+          return true;
+        }
+        return false;
+      });
+      return hit;
+    },
+
+    /* ----------------------------------------------------------------------
+       CMS pages
+       ---------------------------------------------------------------------- */
+
+    cmsPages: function () { return state.cmsPages; },
+
+    cmsPage: function (slug) {
+      return state.cmsPages.filter(function (p) { return p.slug === slug; })[0] || null;
+    },
+
+    saveCmsPage: function (slug, patch) {
+      var p = Store.cmsPage(slug);
+      if (!p) return null;
+      Object.assign(p, patch, { updated: new Date().toISOString() });
+      persist();
+      return p;
+    },
+
+    /* ----------------------------------------------------------------------
+       Settings (Stripe)
+       ---------------------------------------------------------------------- */
+
+    settings: function () { return state.settings; },
+
+    saveSettings: function (patch) {
+      Object.assign(state.settings, patch);
+      persist();
+      return state.settings;
     },
 
     /* ----------------------------------------------------------------------
@@ -117,8 +413,10 @@
     mechanics: function () { return state.mechanics; },
 
     manager: function (id) {
-      return FS.data.managers.filter(function (m) { return m.id === id; })[0] || null;
+      return (state.managers || FS.data.managers).filter(function (m) { return m.id === id; })[0] || null;
     },
+
+    managers: function () { return state.managers || FS.data.managers; },
 
     /** Newest first — the review page and homepage both rely on this order. */
     reviews: function (status) {
@@ -352,8 +650,19 @@
         id: id, fleetSize: 1, since: new Date().toISOString(), status: 'active'
       }, payload, { id: id });
       state.customers.unshift(customer);
+      // Give the new account a portal password straight away — New Sale reads
+      // it back on the confirmation screen.
+      if (customer.email) {
+        state.credentials[customer.email.toLowerCase()] =
+          payload.password || ('FS-' + Math.random().toString(36).slice(2, 8).toUpperCase());
+      }
       persist();
       return customer;
+    },
+
+    /** The password held for an account, so it can be shown once at creation. */
+    passwordFor: function (email) {
+      return state.credentials[String(email || '').toLowerCase()] || null;
     },
 
     addReview: function (payload) {

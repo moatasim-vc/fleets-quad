@@ -155,6 +155,7 @@
                 { sep: true },
                 { act: 'link', icon: 'link', label: 'Payment link' },
                 { act: 'charge', icon: 'credit-card', label: 'Charge card' },
+                { act: 'mark-paid', icon: 'check-circle', label: 'Mark fully paid' },
                 { sep: true },
                 { act: 'cancel', icon: 'x-circle', label: 'Cancel order', danger: true }
               ]);
@@ -191,6 +192,7 @@
       else if (act === 'edit') editOrderModal(o, render);
       else if (act === 'link') Dash.paymentLinkModal(o);
       else if (act === 'charge') Dash.chargeModal(o, render);
+      else if (act === 'mark-paid') Dash.markPaidModal(o, render);
       else if (act === 'cancel') {
         FS.confirm('Cancel ' + o.id + '?', 'The customer will be notified and any deposit refunded.', function () {
           Store.setStatus(o.id, 'canceled', FS.shell.session.name);
@@ -334,6 +336,11 @@
                 '<div class="stack mt-5" style="gap:var(--sp-2)">' +
                   '<button class="btn btn-primary btn-block" data-act="link">' + FS.icon('link') + 'Generate Stripe payment link</button>' +
                   '<button class="btn btn-dark btn-block" data-act="charge">' + FS.icon('credit-card') + 'Manual Stripe charge</button>' +
+                  /* Lets an operator close out a project that was settled off
+                     the platform — cash, cheque or a transfer. */
+                  (o.payment === 'paid'
+                    ? '<button class="btn btn-outline btn-block" data-act="unpaid">' + FS.icon('refresh') + 'Mark unpaid</button>'
+                    : '<button class="btn btn-success btn-block" data-act="mark-paid">' + FS.icon('check-circle') + 'Mark project fully paid</button>') +
                   '<button class="btn btn-outline btn-block" data-act="payout">' + FS.icon('wallet') + 'Record mechanic payment</button>' +
                 '</div>' +
               '</div></div>' +
@@ -379,6 +386,15 @@
         else if (act === 'link') Dash.paymentLinkModal(o);
         else if (act === 'charge') Dash.chargeModal(o, render);
         else if (act === 'payout') Dash.payoutModal(o, render);
+        else if (act === 'mark-paid') Dash.markPaidModal(o, render);
+        else if (act === 'unpaid') {
+          FS.confirm('Mark ' + o.id + ' unpaid?', 'The project goes back to awaiting payment.', function () {
+            Store.updateOrder(o.id, { payment: 'unpaid' },
+              { who: FS.shell.session.name, text: 'Payment status set back to unpaid' });
+            FS.toast('Marked unpaid', o.id, 'warn');
+            render();
+          }, true);
+        }
         return;
       }
 
@@ -423,13 +439,17 @@
   FS.dash.wireProject = wire;
 
   /* ======================================================================
-     New Sale — six-step workflow
+     New Sale — five-step workflow
+     Labour and payment share one screen: an hourly rate times a number of
+     hours, an optional free-form charge on top, then the card fields and a
+     Charge button. Payment is optional — the sale can be booked unpaid and
+     the mechanic assigned anyway, then marked fully paid later.
      ====================================================================== */
 
   function newSale() {
     var draft = { vehicles: [] };
     var step = 1;
-    var STEPS = ['Create Customer', 'Vehicle Info', 'Labor Amount', 'Select Mechanic', 'Payment', 'Confirmation'];
+    var STEPS = ['Create Customer', 'Vehicle Info', 'Labor &amp; Payment', 'Assign Mechanic', 'Confirmation'];
 
     render();
 
@@ -458,8 +478,16 @@
       if (step === 2) return step2();
       if (step === 3) return step3();
       if (step === 4) return step4();
-      if (step === 5) return step5();
-      return step6();
+      return step5();
+    }
+
+    /** Labour subtotal plus whatever extra was typed in. */
+    function totals() {
+      var rate  = Number(draft.hourlyRate) || 0;
+      var hours = Number(draft.hours) || 0;
+      var labor = Math.round(rate * hours * 100) / 100;
+      var extra = Number(draft.extraCharge) || 0;
+      return { rate: rate, hours: hours, labor: labor, extra: extra, total: labor + extra };
     }
 
     /* --- 1. Create customer ------------------------------------------- */
@@ -532,37 +560,107 @@
         nav('Back', 'Continue');
     }
 
-    /* --- 3. Labor amount ---------------------------------------------- */
+    /* --- 3. Labor amount + payment ------------------------------------- */
     function step3() {
-      var presets = [
-        { label: 'Standard PM', rate: 145, note: 'Per vehicle, includes fluids' },
-        { label: 'Diagnostic', rate: 189, note: 'First hour, credited to repair' },
-        { label: 'Repair labour', rate: 165, note: 'Per hour, per technician' },
-        { label: 'Emergency roadside', rate: 240, note: 'Call-out plus first hour' }
-      ];
+      var t = totals();
+
       return '<h3 class="mb-2">Select labor amount</h3>' +
-        '<p class="text-muted mb-6">Choose a rate card or enter a flat amount for the whole project.</p>' +
-        '<div class="stack mb-6">' + presets.map(function (p, i) {
-          return '<label class="opt-card' + (draft.laborPreset === i ? ' is-selected' : '') + '">' +
-            '<input type="radio" name="labor" value="' + i + '"' + (draft.laborPreset === i ? ' checked' : '') + '>' +
-            '<span style="flex:1 1 auto"><strong>' + p.label + '</strong><span>' + p.note + '</span></span>' +
-            '<strong class="text-navy">' + FS.money(p.rate) + '</strong></label>';
-        }).join('') + '</div>' +
+        '<p class="text-muted mb-6">Enter the hourly rate and the number of hours. ' +
+          'Add any other charge underneath, then take the card — or skip payment and bill later.</p>' +
+
         '<form id="nsForm" novalidate>' +
-          '<div class="field-row field-row-2">' +
-            inp('Labour total ($)', 'laborTotal', 'number', draft.laborTotal || 0, true) +
-            inp('Parts &amp; materials ($)', 'partsTotal', 'number', draft.partsTotal || 0) +
+
+          /* Hourly rate x hours -------------------------------------------- */
+          '<div class="rate-row">' +
+            '<div class="field"><label class="label" for="ns_hourlyRate">Hourly rate ($) <span class="req">*</span></label>' +
+              '<input class="input" id="ns_hourlyRate" name="hourlyRate" type="number" min="0" step="1" ' +
+              'inputmode="decimal" placeholder="165" value="' + FS.esc(draft.hourlyRate == null ? '' : draft.hourlyRate) + '" required></div>' +
+            '<span class="rate-op" aria-hidden="true">&times;</span>' +
+            '<div class="field"><label class="label" for="ns_hours">Number of hours <span class="req">*</span></label>' +
+              '<input class="input" id="ns_hours" name="hours" type="number" min="0" step="0.25" ' +
+              'inputmode="decimal" placeholder="4" value="' + FS.esc(draft.hours == null ? '' : draft.hours) + '" required></div>' +
+            '<span class="rate-op" aria-hidden="true">=</span>' +
+            '<div class="field"><label class="label">Labor total</label>' +
+              '<output class="input input--readonly" id="nsLaborOut">' + FS.money(t.labor, true) + '</output></div>' +
           '</div>' +
+
+          /* Anything else ---------------------------------------------------- */
+          '<div class="divider"></div>' +
+          '<div class="field-row field-row-2">' +
+            '<div class="field"><label class="label" for="ns_extraCharge">Additional charge ($)</label>' +
+              '<input class="input" id="ns_extraCharge" name="extraCharge" type="number" min="0" step="1" ' +
+              'inputmode="decimal" placeholder="0" value="' + FS.esc(draft.extraCharge == null ? '' : draft.extraCharge) + '">' +
+              '<p class="hint">Parts, materials, call-out — any amount you want to add.</p></div>' +
+            '<div class="field"><label class="label" for="ns_extraLabel">What is it for?</label>' +
+              '<input class="input" id="ns_extraLabel" name="extraLabel" type="text" ' +
+              'placeholder="Parts &amp; materials" value="' + FS.esc(draft.extraLabel || '') + '"></div>' +
+          '</div>' +
+
+          /* Running total ---------------------------------------------------- */
+          '<div class="card mt-6"><div class="card-body">' +
+            '<div class="money-row"><span id="nsLaborLine">Labor · ' +
+              (t.hours ? FS.money(t.rate) + ' &times; ' + t.hours + ' h' : 'rate &times; hours') + '</span>' +
+              '<strong id="nsLaborAmt">' + FS.money(t.labor, true) + '</strong></div>' +
+            '<div class="money-row"><span id="nsExtraLine">' + FS.esc(draft.extraLabel || 'Additional charge') + '</span>' +
+              '<strong id="nsExtraAmt">' + FS.money(t.extra, true) + '</strong></div>' +
+            '<div class="money-row money-row--total"><span>Amount due</span>' +
+              '<strong id="nsTotalAmt">' + FS.money(t.total, true) + '</strong></div>' +
+          '</div></div>' +
+
+          /* Card ------------------------------------------------------------- */
+          '<div class="divider"></div>' +
+          '<h4 class="mb-2">Charge the customer</h4>' +
+          '<p class="text-muted text-sm mb-5">Optional. Leave it blank to book the project unpaid — ' +
+            'you can still assign a mechanic and mark the project fully paid later.</p>' +
+
+          (draft.paid
+            ? '<div class="alert alert--ok">' + FS.icon('check-circle') +
+                '<div><strong>Payment captured — ' + FS.money(draft.paidAmount, true) + '</strong><br>' +
+                FS.esc(draft.cardLabel) + '. The receipt is emailed with the confirmation.</div></div>' +
+              '<button class="btn btn-outline btn-sm mt-4" id="nsUndoPay" type="button">' +
+                FS.icon('refresh') + 'Undo payment</button>'
+            : '<div class="pay-box">' +
+                '<div class="field"><label class="label" for="ns_card">Credit card number</label>' +
+                  '<div class="input-icon">' + FS.icon('credit-card') +
+                  '<input class="input" id="ns_card" name="card" type="text" inputmode="numeric" ' +
+                  'autocomplete="cc-number" maxlength="23" placeholder="4242 4242 4242 4242" ' +
+                  'value="' + FS.esc(draft.card || '') + '"></div></div>' +
+                '<div class="field-row field-row-3">' +
+                  '<div class="field"><label class="label" for="ns_exp">Exp date</label>' +
+                    '<input class="input" id="ns_exp" name="exp" type="text" inputmode="numeric" ' +
+                    'autocomplete="cc-exp" maxlength="5" placeholder="MM/YY" value="' + FS.esc(draft.exp || '') + '"></div>' +
+                  '<div class="field"><label class="label" for="ns_cvc">CVC</label>' +
+                    '<input class="input" id="ns_cvc" name="cvc" type="text" inputmode="numeric" ' +
+                    'autocomplete="cc-csc" maxlength="4" placeholder="123" value="' + FS.esc(draft.cvc || '') + '"></div>' +
+                  '<div class="field"><label class="label" for="ns_cardZip">Zip code</label>' +
+                    '<input class="input" id="ns_cardZip" name="cardZip" type="text" inputmode="numeric" ' +
+                    'autocomplete="postal-code" maxlength="5" placeholder="' + FS.esc(draft.zip || '10001') + '" ' +
+                    'value="' + FS.esc(draft.cardZip || '') + '"></div>' +
+                '</div>' +
+                '<button class="btn btn-dark btn-block mt-4" type="button" id="nsCharge">' +
+                  FS.icon('credit-card') + 'Charge <span id="nsChargeAmt">' + FS.money(t.total, true) + '</span></button>' +
+                '<p class="hint text-center mt-3">Card details are never stored — in production this posts ' +
+                  'straight to Stripe. Nothing is charged in this prototype.</p>' +
+              '</div>') +
         '</form>' +
-        '<div class="alert alert--info mt-5">' + FS.icon('info') +
-          '<div>Selecting a rate card multiplies it by the number of vehicles (' + draft.vehicles.length + ').</div></div>' +
         nav('Back', 'Continue');
     }
 
-    /* --- 4. Select mechanic -------------------------------------------- */
+    /* --- 4. Assign mechanic --------------------------------------------- */
     function step4() {
-      return '<h3 class="mb-2">Select mechanic</h3>' +
-        '<p class="text-muted mb-6">The technician receives an SMS with the project ID, service type and location.</p>' +
+      var t = totals();
+      return '<h3 class="mb-2">Assign mechanic</h3>' +
+        '<p class="text-muted mb-6">The technician receives an SMS with the project ID, service type and location. ' +
+          'A project can be assigned whether or not it has been paid.</p>' +
+
+        '<div class="alert alert--' + (draft.paid ? 'ok' : 'warn') + ' mb-6">' +
+          FS.icon(draft.paid ? 'check-circle' : 'alert-triangle') +
+          '<div>' + (draft.paid
+            ? '<strong>Paid — ' + FS.money(draft.paidAmount, true) + '</strong> collected on ' + FS.esc(draft.cardLabel) + '.'
+            : '<strong>Unpaid — ' + FS.money(t.total, true) + ' outstanding.</strong> ' +
+              'The project books anyway and can be marked fully paid from the project screen.') +
+          '</div></div>' +
+
         '<div class="stack">' + Store.mechanics().map(function (m) {
           return '<label class="opt-card' + (draft.mechanicId === m.id ? ' is-selected' : '') + '">' +
             '<input type="radio" name="mech" value="' + m.id + '"' + (draft.mechanicId === m.id ? ' checked' : '') + '>' +
@@ -571,40 +669,28 @@
             '<span>' + FS.esc(m.certs) + ' · ' + FS.esc(m.city + ', ' + m.state) + ' · ' + FS.money(m.hourlyRate) + '/h</span></span>' +
             '<span class="badge badge--' + (m.status === 'available' ? 'ok' : m.status === 'on-job' ? 'warn' : 'neutral') + '">' +
             FS.esc(m.status) + '</span></label>';
-        }).join('') + '</div>' + nav('Back', 'Continue');
+        }).join('') + '</div>' +
+        '<label class="opt-card mt-3">' +
+          '<input type="radio" name="mech" value=""' + (draft.mechanicId === '' ? ' checked' : '') + '>' +
+          '<span class="avatar avatar--sm">' + FS.icon('clock') + '</span>' +
+          '<span style="flex:1 1 auto"><strong>Leave unassigned for now</strong>' +
+          '<span>Books the project as Open so dispatch can pick the technician.</span></span></label>' +
+        nav('Back', 'Complete sale');
     }
 
-    /* --- 5. Payment ----------------------------------------------------- */
+    /* --- 5. Confirmation ------------------------------------------------ */
     function step5() {
-      var total = (Number(draft.laborTotal) || 0) + (Number(draft.partsTotal) || 0);
-      draft.total = total;
-      return '<h3 class="mb-2">Payment</h3>' +
-        '<p class="text-muted mb-6">Take payment now or issue a Stripe payment link with the confirmation.</p>' +
-        '<div class="card mb-6"><div class="card-body">' +
-          '<div class="money-row"><span>Labour</span><strong>' + FS.money(draft.laborTotal || 0) + '</strong></div>' +
-          '<div class="money-row"><span>Parts &amp; materials</span><strong>' + FS.money(draft.partsTotal || 0) + '</strong></div>' +
-          '<div class="money-row money-row--total"><span>Total due</span><strong>' + FS.money(total) + '</strong></div>' +
-        '</div></div>' +
-        '<div class="stack">' +
-          ['Charge card now', 'Send Stripe payment link', 'Invoice on net-30 terms'].map(function (opt, i) {
-            return '<label class="opt-card' + ((draft.payMethod || 0) === i ? ' is-selected' : '') + '">' +
-              '<input type="radio" name="pay" value="' + i + '"' + ((draft.payMethod || 0) === i ? ' checked' : '') + '>' +
-              '<span style="flex:1 1 auto"><strong>' + opt + '</strong></span>' + FS.icon(['credit-card', 'link', 'receipt'][i]) +
-            '</label>';
-          }).join('') +
-        '</div>' + nav('Back', 'Complete sale');
-    }
-
-    /* --- 6. Confirmation ------------------------------------------------ */
-    function step6() {
       var o = draft.created;
       var c = draft.customer;
+      var mech = Store.mechanic(o.mechanicId);
       return '<div class="success-hero">' +
           '<div class="success-mark">' + FS.icon('check') + '</div>' +
           '<h2>Sale complete</h2>' +
-          '<p class="text-muted" style="max-width:44ch;margin:10px auto 0">' +
-            'The project is live, the technician has been notified and the customer has portal access.</p>' +
-          '<div class="mt-6"><span class="ref-badge"><small>Project ID</small><strong>' + FS.esc(o.id) + '</strong></span></div>' +
+          '<p class="text-muted" style="max-width:46ch;margin:10px auto 0">' +
+            'The project is live' + (mech ? ', the technician has been notified' : '') +
+            ' and the customer has portal access.</p>' +
+          '<div class="mt-6"><span class="ref-badge"><small>Project ID</small><strong>' + FS.esc(o.id) + '</strong></span>' +
+            ' ' + Dash.paymentBadge(o.payment) + '</div>' +
         '</div>' +
 
         '<div class="dash-grid dash-grid--1-1 mt-6">' +
@@ -615,18 +701,30 @@
               '<div class="creds-row"><small>Temp password</small><code>' + FS.esc(draft.tempPassword) + '</code></div>' +
             '</div>' +
             '<p class="hint mt-4">The customer is asked to change this on first sign-in.</p>' +
+
+            '<div class="divider"></div>' +
+            '<div class="money-row"><span>Labor · ' + FS.money(draft.rate) + ' &times; ' + draft.hours + ' h</span>' +
+              '<strong>' + FS.money(o.laborTotal, true) + '</strong></div>' +
+            (o.partsTotal ? '<div class="money-row"><span>' + FS.esc(draft.extraLabel || 'Additional charge') + '</span>' +
+              '<strong>' + FS.money(o.partsTotal, true) + '</strong></div>' : '') +
+            '<div class="money-row money-row--total"><span>' +
+              (o.payment === 'paid' ? 'Paid' : 'Outstanding') + '</span>' +
+              '<strong>' + FS.money(draft.total, true) + '</strong></div>' +
           '</div></div>' +
 
           '<div class="card"><div class="card-head"><h4>Notifications sent</h4></div><div class="card-body">' +
-            '<div class="msg-preview mb-4">' +
-              '<div class="msg-preview-head">' + FS.icon('message') + 'SMS to technician</div>' +
+            (mech ? '<div class="msg-preview mb-4">' +
+              '<div class="msg-preview-head">' + FS.icon('message') + 'SMS to ' + FS.esc(mech.name) + '</div>' +
               '<div class="msg-preview-body">New Project Assigned\nProject ID: ' + o.id +
                 '\nService Type: ' + o.serviceType + '\nLocation: ' + o.address + ', ' + o.city + ', ' + o.state + '</div>' +
-            '</div>' +
+            '</div>' : '') +
             '<div class="msg-preview">' +
               '<div class="msg-preview-head">' + FS.icon('mail') + 'Email to customer</div>' +
               '<div class="msg-preview-body">Welcome to FleetSquad, ' + FS.esc(c.firstName) + '.\n' +
-                'Project ' + o.id + ' is confirmed. Total ' + FS.money(draft.total) + '.\n' +
+                'Project ' + o.id + ' is confirmed. Total ' + FS.money(draft.total, true) + '.\n' +
+                (o.payment === 'paid'
+                  ? 'Payment received — thank you.\n'
+                  : 'A payment link follows separately.\n') +
                 'Sign in to track every vehicle in real time.</div>' +
             '</div>' +
           '</div></div>' +
@@ -667,17 +765,7 @@
         });
       });
 
-      /* Rate-card selection multiplies through to the labour total. */
-      FS.$$('input[name="labor"]', host).forEach(function (r) {
-        r.addEventListener('change', function () {
-          var rates = [145, 189, 165, 240];
-          draft.laborPreset = Number(r.value);
-          var count = Math.max(1, draft.vehicles.length);
-          draft.laborTotal = rates[draft.laborPreset] * count;
-          draft.partsTotal = Math.round(draft.laborTotal * 0.42);
-          render();
-        });
-      });
+      if (step === 3) wireLaborStep();
 
       var restart = document.getElementById('nsRestart');
       if (restart) restart.addEventListener('click', function () {
@@ -686,6 +774,96 @@
 
       var next = document.getElementById('nsNext');
       if (next) next.addEventListener('click', onNext);
+    }
+
+    /* Rate x hours recalculates as you type, and the Charge button follows. */
+    function wireLaborStep() {
+      var rate  = document.getElementById('ns_hourlyRate');
+      var hours = document.getElementById('ns_hours');
+      var extra = document.getElementById('ns_extraCharge');
+      var label = document.getElementById('ns_extraLabel');
+
+      [rate, hours, extra, label].forEach(function (input) {
+        if (!input) return;
+        input.addEventListener('input', function () {
+          draft.hourlyRate  = rate.value;
+          draft.hours       = hours.value;
+          draft.extraCharge = extra.value;
+          draft.extraLabel  = label.value;
+          paint();
+        });
+      });
+
+      function paint() {
+        var t = totals();
+        set('nsLaborOut', FS.money(t.labor, true));
+        set('nsLaborAmt', FS.money(t.labor, true));
+        set('nsExtraAmt', FS.money(t.extra, true));
+        set('nsTotalAmt', FS.money(t.total, true));
+        set('nsChargeAmt', FS.money(t.total, true));
+        set('nsLaborLine', t.hours ? 'Labor · ' + FS.money(t.rate) + ' × ' + t.hours + ' h' : 'Labor · rate × hours');
+        set('nsExtraLine', draft.extraLabel || 'Additional charge');
+      }
+      function set(id, text) {
+        var node = document.getElementById(id);
+        if (node) node.textContent = text;
+      }
+
+      /* Card number and expiry format themselves as you type. */
+      var card = document.getElementById('ns_card');
+      if (card) card.addEventListener('input', function () {
+        var digits = card.value.replace(/\D/g, '').slice(0, 19);
+        card.value = digits.replace(/(.{4})/g, '$1 ').trim();
+      });
+
+      var exp = document.getElementById('ns_exp');
+      if (exp) exp.addEventListener('input', function () {
+        var d = exp.value.replace(/\D/g, '').slice(0, 4);
+        exp.value = d.length > 2 ? d.slice(0, 2) + '/' + d.slice(2) : d;
+      });
+
+      var charge = document.getElementById('nsCharge');
+      if (charge) charge.addEventListener('click', takePayment);
+
+      var undo = document.getElementById('nsUndoPay');
+      if (undo) undo.addEventListener('click', function () {
+        draft.paid = false;
+        draft.paidAmount = 0;
+        draft.cardLabel = '';
+        render();
+      });
+    }
+
+    /* Simulated authorisation. A real build hands these fields to Stripe.js
+       and never lets the number reach our own code. */
+    function takePayment() {
+      var t = totals();
+      if (t.total <= 0) {
+        FS.toast('Nothing to charge', 'Enter a rate and hours first.', 'warn');
+        return;
+      }
+      var number = (document.getElementById('ns_card').value || '').replace(/\D/g, '');
+      var exp    = document.getElementById('ns_exp').value || '';
+      var cvc    = (document.getElementById('ns_cvc').value || '').replace(/\D/g, '');
+      var zip    = (document.getElementById('ns_cardZip').value || '').replace(/\D/g, '');
+
+      if (number.length < 13) { FS.toast('Check the card number', 'Enter the full number on the card.', 'warn'); return; }
+      if (!/^\d{2}\/\d{2}$/.test(exp)) { FS.toast('Check the expiry', 'Use MM/YY.', 'warn'); return; }
+      if (cvc.length < 3) { FS.toast('Check the CVC', 'Three or four digits.', 'warn'); return; }
+      if (zip.length !== 5) { FS.toast('Check the zip code', 'Five digits.', 'warn'); return; }
+
+      var brand = number[0] === '4' ? 'Visa' : number[0] === '5' ? 'Mastercard' :
+                  number[0] === '3' ? 'Amex' : number[0] === '6' ? 'Discover' : 'Card';
+
+      draft.paid       = true;
+      draft.paidAmount = t.total;
+      draft.cardLabel  = brand + ' •••• ' + number.slice(-4);
+      draft.cardZip    = zip;
+      // The number, CVC and expiry are deliberately not kept on the draft.
+      draft.card = ''; draft.cvc = ''; draft.exp = '';
+
+      FS.toast('Payment captured', FS.money(t.total, true) + ' on ' + draft.cardLabel, 'ok');
+      render();
     }
 
     function onNext() {
@@ -703,16 +881,23 @@
         }
       } else if (step === 3) {
         if (!FS.validate(form)) return;
-        Object.assign(draft, FS.formData(form));
+        draft.hourlyRate  = document.getElementById('ns_hourlyRate').value;
+        draft.hours       = document.getElementById('ns_hours').value;
+        draft.extraCharge = document.getElementById('ns_extraCharge').value;
+        draft.extraLabel  = document.getElementById('ns_extraLabel').value;
+        if (totals().total <= 0) {
+          FS.toast('Enter an amount', 'A sale needs a labor rate and hours, or an additional charge.', 'warn');
+          return;
+        }
       } else if (step === 4) {
         var picked = host.querySelector('input[name="mech"]:checked');
-        if (!picked) { FS.toast('Select a mechanic', 'Choose who will run this project.', 'warn'); return; }
+        if (!picked) {
+          FS.toast('Choose an option', 'Pick a technician, or leave the project unassigned.', 'warn');
+          return;
+        }
         draft.mechanicId = picked.value;
-      } else if (step === 5) {
-        var pay = host.querySelector('input[name="pay"]:checked');
-        draft.payMethod = pay ? Number(pay.value) : 0;
         finish();
-        step = 6;
+        step = 5;
         render();
         return;
       }
@@ -757,10 +942,13 @@
 
     /* Commit the draft to the store. */
     function finish() {
+      var t = totals();
+      var tempPassword = 'FS-' + Math.abs(hashCode(draft.email)).toString(36).slice(0, 6).toUpperCase();
+
       var customer = Store.createCustomer({
         company: draft.company, firstName: draft.firstName, lastName: draft.lastName,
         email: draft.email, phone: draft.phone, city: draft.city, state: draft.state,
-        zip: draft.zip, fleetSize: draft.vehicles.length
+        zip: draft.zip, fleetSize: draft.vehicles.length, password: tempPassword
       });
 
       var order = Store.createOrder({
@@ -771,44 +959,56 @@
         allowedVehicles: Number(draft.allowedVehicles) || draft.vehicles.length,
         address: draft.address, city: draft.city, state: draft.state, zip: draft.zip,
         location: draft.location, details: draft.details,
-        laborTotal: Number(draft.laborTotal) || 0,
-        partsTotal: Number(draft.partsTotal) || 0,
-        mechanicPayout: Math.round((Number(draft.laborTotal) || 0) * 0.45),
-        status: 'assigned',
-        payment: draft.payMethod === 0 ? 'paid' : 'unpaid'
+        hourlyRate: t.rate,
+        laborHours: t.hours,
+        laborTotal: t.labor,
+        partsTotal: t.extra,
+        extraLabel: draft.extraLabel || 'Additional charge',
+        mechanicPayout: Math.round(t.labor * 0.45),
+        // Unpaid projects still book and still take a mechanic.
+        status: draft.mechanicId ? 'assigned' : 'open',
+        payment: draft.paid ? 'paid' : 'unpaid'
       });
 
       draft.vehicles.forEach(function (v) { Store.addVehicle(order.id, v); });
       // addVehicle recalculates labour from the vehicle rows; restore the
-      // amount the operator actually chose on step 3.
-      Store.updateOrder(order.id, {
-        laborTotal: Number(draft.laborTotal) || 0,
-        partsTotal: Number(draft.partsTotal) || 0
-      });
-      Store.assignMechanic(order.id, draft.mechanicId, FS.shell.session.name);
+      // amount the operator actually entered on step 3.
+      Store.updateOrder(order.id, { laborTotal: t.labor, partsTotal: t.extra });
 
-      if (draft.payMethod === 0) {
+      if (draft.mechanicId) {
+        Store.assignMechanic(order.id, draft.mechanicId, FS.shell.session.name);
+      }
+
+      if (draft.paid) {
         Store.addPayment({
-          orderId: order.id, customerId: customer.id, amount: draft.total,
-          method: 'Stripe · Visa ••4242', type: 'charge', status: 'succeeded'
+          orderId: order.id, customerId: customer.id, amount: t.total,
+          method: 'Stripe · ' + draft.cardLabel, type: 'charge', status: 'succeeded'
         });
+        Store.logTimeline(order.id, FS.shell.session.name,
+          'Payment of ' + FS.money(t.total, true) + ' captured on ' + draft.cardLabel);
+      } else {
+        Store.logTimeline(order.id, FS.shell.session.name,
+          'Booked unpaid — ' + FS.money(t.total, true) + ' outstanding');
       }
 
       Store.notify({
         channel: 'email', audience: 'customer', orderId: order.id,
         title: 'Welcome to FleetSquad',
-        body: 'Project ' + order.id + ' is confirmed. Total ' + FS.money(draft.total) +
-              '. Sign in to track every vehicle in real time.'
+        body: 'Project ' + order.id + ' is confirmed. Total ' + FS.money(t.total, true) +
+              (draft.paid ? '. Payment received — thank you.' : '. A payment link follows separately.') +
+              ' Sign in to track every vehicle in real time.'
       });
 
+      draft.rate = t.rate;
+      draft.total = t.total;
       draft.customer = customer;
       draft.created = Store.order(order.id);
-      draft.tempPassword = 'FS-' + Math.abs(hashCode(customer.email)).toString(36).slice(0, 6).toUpperCase();
+      draft.tempPassword = tempPassword;
     }
 
     function hashCode(s) {
       var h = 0;
-      for (var i = 0; i < s.length; i++) { h = ((h << 5) - h) + s.charCodeAt(i); h |= 0; }
+      for (var i = 0; i < String(s).length; i++) { h = ((h << 5) - h) + String(s).charCodeAt(i); h |= 0; }
       return h;
     }
   }
@@ -1145,20 +1345,31 @@
     render();
 
     function render() {
+      var pages = Store.cmsPages();
+
       host.innerHTML =
         '<div class="page-head"><div><h2>CMS Pages</h2>' +
-          '<p>Editable content for the marketing site. ' + D.cmsPages.length + ' page templates.</p></div>' +
-          '<div class="page-head-actions"><button class="btn btn-primary" id="newPage">' + FS.icon('plus') + 'New page</button></div>' +
+          '<p>The heading, standfirst and search-engine record for every inner page reachable from the nav bar. ' +
+            'Edits show on the live page straight away.</p></div>' +
+          '<div class="page-head-actions">' +
+            '<a class="btn btn-outline" href="' + FS.url('admin/blog.html') + '">' + FS.icon('edit') + 'Blog</a>' +
+            '<a class="btn btn-outline" href="' + FS.url('admin/service-areas.html') + '">' + FS.icon('map') + 'Service Areas</a>' +
+          '</div>' +
         '</div>' +
 
         '<div class="table-wrap"><div class="scroll-x">' +
           '<table class="table table--stack"><thead><tr>' +
-            '<th>Page</th><th>Slug</th><th>Sections</th><th>Last updated</th><th>Status</th><th class="td-actions">Actions</th>' +
-          '</tr></thead><tbody>' + D.cmsPages.map(function (p) {
+            '<th>Page</th><th>Address</th><th>Meta title</th><th>Last updated</th><th>Status</th><th class="td-actions">Actions</th>' +
+          '</tr></thead><tbody>' + pages.map(function (p) {
+            var titleLen = (p.metaTitle || '').length;
+            var descLen = (p.metaDescription || '').length;
+            var seoOk = titleLen >= 25 && titleLen <= 62 && descLen >= 90 && descLen <= 165;
             return '<tr>' +
               '<td data-label="Page" class="td-strong">' + FS.esc(p.title) + '</td>' +
-              '<td data-label="Slug"><code class="text-sm text-dim">/' + FS.esc(p.slug) + '</code></td>' +
-              '<td data-label="Sections">' + p.sections + '</td>' +
+              '<td data-label="Address"><code class="text-sm text-dim">/' + FS.esc(p.slug) + '</code></td>' +
+              '<td data-label="Meta title"><span class="text-sm">' + FS.esc(p.metaTitle || '—') + '</span><br>' +
+                '<small class="text-xs ' + (seoOk ? 'text-ok' : 'text-dim') + '">' +
+                'Title ' + titleLen + '/60 · Description ' + descLen + '/160</small></td>' +
               '<td data-label="Updated">' + FS.date(p.updated) + '</td>' +
               '<td data-label="Status"><span class="badge badge--' + (p.status === 'published' ? 'ok' : 'warn') + '">' +
                 FS.esc(p.status) + '</span></td>' +
@@ -1173,98 +1384,715 @@
           '<div class="card card-pad"><span class="kpi-icon mb-3">' + FS.icon('file-text') + '</span>' +
             '<h4 class="mb-2">SEO templates</h4><p class="text-muted text-sm mb-0">' +
             (D.services.length + D.industries.length + D.vehicleTypes.length) +
-            ' service, industry and vehicle pages generated from one reusable template.</p></div>' +
-          '<div class="card card-pad"><span class="kpi-icon mb-3">' + FS.icon('list') + '</span>' +
-            '<h4 class="mb-2">Blog posts</h4><p class="text-muted text-sm mb-0">' + D.posts.length +
-            ' published across ' + D.postCategories.length + ' categories.</p></div>' +
-          '<div class="card card-pad"><span class="kpi-icon mb-3">' + FS.icon('map') + '</span>' +
-            '<h4 class="mb-2">Service areas</h4><p class="text-muted text-sm mb-0">' + D.serviceAreas.length +
-            ' states listed on the public coverage page.</p></div>' +
+            ' service, industry and vehicle pages generated from one reusable template, each with its own title and description.</p></div>' +
+          '<a class="card card-pad card-hover" href="' + FS.url('admin/blog.html') + '"><span class="kpi-icon mb-3">' + FS.icon('list') + '</span>' +
+            '<h4 class="mb-2">Blog posts</h4><p class="text-muted text-sm mb-0">' + Store.posts('published').length +
+            ' published across ' + D.postCategories.length + ' categories. Edit copy, SEO and article links.</p></a>' +
+          '<a class="card card-pad card-hover" href="' + FS.url('admin/service-areas.html') + '"><span class="kpi-icon mb-3">' + FS.icon('map') + '</span>' +
+            '<h4 class="mb-2">Service areas</h4><p class="text-muted text-sm mb-0">' + Store.serviceAreas(true).length +
+            ' states on the public coverage page. Add states, counties and cities.</p></a>' +
         '</div>';
 
-      document.getElementById('newPage').addEventListener('click', function () {
-        FS.toast('Prototype only', 'Page creation needs the backend.', 'info');
+      FS.$$('[data-cms]', host).forEach(function (b) {
+        b.addEventListener('click', function () { editModal(Store.cmsPage(b.dataset.cms)); });
       });
+      FS.hydrateIcons(host);
     }
 
-    host.addEventListener('click', function (e) {
-      var b = e.target.closest('[data-cms]');
-      if (!b) return;
-      var p = D.cmsPages.filter(function (x) { return x.slug === b.dataset.cms; })[0];
+    function editModal(p) {
       FS.modal({
         title: 'Edit: ' + p.title,
         subtitle: '/' + p.slug,
         size: 'lg',
         body: '<form id="cmsForm">' +
-          '<div class="field"><label class="label" for="cmTitle">Page title</label>' +
-            '<input class="input" id="cmTitle" value="' + FS.esc(p.title) + '"></div>' +
+          '<div class="field"><label class="label" for="cmName">Name in the admin</label>' +
+            '<input class="input" id="cmName" name="title" value="' + FS.esc(p.title) + '"></div>' +
+          '<div class="field"><label class="label" for="cmHeading">Page heading (H1)</label>' +
+            '<input class="input" id="cmHeading" name="heading" value="' + FS.esc(p.heading || '') + '"></div>' +
+          '<div class="field"><label class="label" for="cmLead">Standfirst under the heading</label>' +
+            '<textarea class="textarea" id="cmLead" name="lead" style="min-height:70px">' + FS.esc(p.lead || '') + '</textarea></div>' +
+          '<div class="divider"></div>' +
+          '<h4 class="mb-4">Search engine listing</h4>' +
+          '<div class="field"><label class="label" for="cmMetaTitle">Meta title</label>' +
+            '<input class="input" id="cmMetaTitle" name="metaTitle" value="' + FS.esc(p.metaTitle || '') + '">' +
+            '<p class="hint" id="cmTitleCount"></p></div>' +
           '<div class="field"><label class="label" for="cmMeta">Meta description</label>' +
-            '<textarea class="textarea" id="cmMeta" style="min-height:80px">FleetSquad — ' + FS.esc(p.title) + '</textarea></div>' +
-          '<div class="field"><label class="label" for="cmBody">Body content</label>' +
-            '<textarea class="textarea" id="cmBody" style="min-height:200px">Edit the copy for this page. In production this maps to a rich-text field on the CMS record.</textarea></div>' +
+            '<textarea class="textarea" id="cmMeta" name="metaDescription" style="min-height:80px">' +
+            FS.esc(p.metaDescription || '') + '</textarea>' +
+            '<p class="hint" id="cmDescCount"></p></div>' +
+          '<div class="field"><label class="label" for="cmKeywords">Keywords</label>' +
+            '<input class="input" id="cmKeywords" name="keywords" value="' + FS.esc(p.keywords || '') + '">' +
+            '<p class="hint">Comma separated.</p></div>' +
           '<div class="field"><label class="label" for="cmStatus">Status</label>' +
-            '<select class="select" id="cmStatus">' +
-              '<option' + (p.status === 'published' ? ' selected' : '') + '>published</option>' +
-              '<option' + (p.status === 'draft' ? ' selected' : '') + '>draft</option>' +
+            '<select class="select" id="cmStatus" name="status">' +
+              '<option value="published"' + (p.status === 'published' ? ' selected' : '') + '>published</option>' +
+              '<option value="draft"' + (p.status === 'draft' ? ' selected' : '') + '>draft</option>' +
             '</select></div>' +
         '</form>',
-        footer: '<button class="btn btn-outline" data-close>Cancel</button><button class="btn btn-primary" id="cmSave">Save page</button>',
+        footer: '<button class="btn btn-outline" data-close>Cancel</button>' +
+                '<button class="btn btn-primary" id="cmSave">Save page</button>',
         onMount: function (root, close) {
+          var title = root.querySelector('#cmMetaTitle');
+          var desc = root.querySelector('#cmMeta');
+          function count() {
+            root.querySelector('#cmTitleCount').textContent = title.value.length + ' / 60 characters';
+            root.querySelector('#cmDescCount').textContent = desc.value.length + ' / 160 characters';
+          }
+          title.addEventListener('input', count);
+          desc.addEventListener('input', count);
+          count();
+
           root.querySelector('#cmSave').addEventListener('click', function () {
-            p.title = root.querySelector('#cmTitle').value;
-            p.status = root.querySelector('#cmStatus').value;
-            p.updated = new Date().toISOString();
+            Store.saveCmsPage(p.slug, FS.formData(root.querySelector('#cmsForm')));
             close();
             FS.toast('Page saved', p.title, 'ok');
             render();
           });
         }
       });
-    });
+    }
   }
 
   /* ======================================================================
-     Shared notification view (used by all four roles)
+     Blog
+     The list is newest-first. Everything the public blog renders — title,
+     slug, meta title, meta description, keywords, the standfirst and the body
+     — is editable here, and articles can be linked to one another.
      ====================================================================== */
 
-  FS.dash.notificationsView = function (mount, audience, lead) {
+  function blog() {
+    var state = { q: '', filter: 'all' };
     render();
 
     function render() {
-      var list = Store.notifications(audience);
-      mount.innerHTML =
-        '<div class="page-head"><div><h2>Notifications</h2><p>' + FS.esc(lead) + '</p></div>' +
+      var all = Store.posts();
+      var list = all;
+      if (state.filter !== 'all') list = list.filter(function (p) { return p.status === state.filter; });
+      if (state.q) {
+        var q = state.q.toLowerCase();
+        list = list.filter(function (p) {
+          return (p.title + ' ' + p.category + ' ' + p.author + ' ' + p.keywords).toLowerCase().indexOf(q) > -1;
+        });
+      }
+
+      host.innerHTML =
+        '<div class="page-head"><div><h2>Blog</h2>' +
+          '<p>' + all.length + ' articles — newest at the top. Edit the copy, the SEO record and the links between articles.</p></div>' +
           '<div class="page-head-actions">' +
-            '<button class="btn btn-outline" id="markAll">' + FS.icon('check') + 'Mark all read</button>' +
+            '<a class="btn btn-outline" href="' + FS.url('blog.html') + '" target="_blank" rel="noopener">' +
+              FS.icon('external') + 'View blog</a>' +
+            '<button class="btn btn-primary" id="newPost">' + FS.icon('plus') + 'New article</button>' +
           '</div></div>' +
 
-        '<div class="card"><div class="card-head">' +
-          '<h3>Inbox <span class="badge badge--info">' + Store.unreadCount(audience) + ' unread</span></h3>' +
-          '<span class="text-sm text-muted">' + list.length + ' total</span></div>' +
-          (list.length ? list.map(function (n) {
-            return '<div class="note-item' + (n.read ? '' : ' is-unread') + '">' +
-              '<span class="note-channel note-channel--' + n.channel + '">' +
-                FS.icon(n.channel === 'sms' ? 'message' : 'mail') + '</span>' +
-              '<div class="note-body"><strong>' + FS.esc(n.title) + '</strong>' +
-                '<p>' + FS.esc(n.body) + '</p>' +
-                (n.orderId ? '<a class="text-xs text-blue text-bold" href="' +
-                  FS.url(audience + '/' + (audience === 'admin' ? 'order-details' :
-                         audience === 'mechanic' ? 'job-details' : 'project-details') + '.html?id=' + n.orderId) +
-                  '">Open ' + FS.esc(n.orderId) + '</a>' : '') +
-              '</div>' +
-              '<span class="note-time">' + FS.ago(n.at) + '</span>' +
-            '</div>';
-          }).join('') : '<div class="empty-state">' + FS.icon('bell') +
-            '<h4>Inbox zero</h4><p>No notifications for this role yet.</p></div>') +
+        Dash.kpiGrid([
+          { icon: 'file-text', tone: 'navy', label: 'Published', value: all.filter(is('published')).length },
+          { icon: 'edit',      tone: 'warn', label: 'Drafts',    value: all.filter(is('draft')).length },
+          { icon: 'link',                    label: 'Article links',
+            value: all.reduce(function (n, p) { return n + (p.related || []).length; }, 0) },
+          { icon: 'list',                    label: 'Categories', value: D.postCategories.length }
+        ], 'kpi-grid--4') +
+
+        '<div class="table-wrap">' +
+          '<div class="toolbar"><div class="input-icon">' + FS.icon('search') +
+            '<input class="input" id="postSearch" placeholder="Search title, category or keyword…" ' +
+            'value="' + FS.esc(state.q) + '"></div></div>' +
+          '<div class="toolbar" style="padding-block:10px"><div class="filters">' +
+            [['all', 'All'], ['published', 'Published'], ['draft', 'Drafts']].map(function (f) {
+              return '<button class="filter-pill' + (f[0] === state.filter ? ' is-active' : '') +
+                '" data-pfilter="' + f[0] + '">' + f[1] + '</button>';
+            }).join('') +
+          '</div></div>' +
+
+          (list.length
+            ? '<div class="scroll-x"><table class="table table--stack"><thead><tr>' +
+                '<th>Article</th><th>Category</th><th>Published</th><th>Links</th>' +
+                '<th>SEO</th><th>Status</th><th class="td-actions">Actions</th></tr></thead><tbody>' +
+              list.map(row).join('') + '</tbody></table></div>'
+            : '<div class="table-empty">' + FS.icon('search') + '<p class="mt-3">No articles match.</p></div>') +
         '</div>';
 
-      document.getElementById('markAll').addEventListener('click', function () {
-        Store.markAllRead(audience);
-        FS.toast('All caught up', '', 'ok');
-        render();
+      wire();
+    }
+
+    function is(status) { return function (p) { return p.status === status; }; }
+
+    function row(p) {
+      // A quick, honest read on whether the SEO record is filled in.
+      var seo = [];
+      if (!p.metaTitle) seo.push('title');
+      if (!p.metaDescription) seo.push('description');
+      if (!p.keywords) seo.push('keywords');
+      var seoCell = seo.length
+        ? '<span class="badge badge--warn">Missing ' + seo.join(', ') + '</span>'
+        : '<span class="badge badge--ok">Complete</span>';
+
+      return '<tr>' +
+        '<td data-label="Article"><span class="td-strong" style="display:block">' + FS.esc(p.title) + '</span>' +
+          '<small class="text-xs text-dim">/blog/' + FS.esc(p.slug) + '</small></td>' +
+        '<td data-label="Category"><span class="chip">' + FS.esc(p.category) + '</span></td>' +
+        '<td data-label="Published">' + FS.date(p.at) + '</td>' +
+        '<td data-label="Links">' + ((p.related || []).length
+          ? '<span class="badge badge--info">' + p.related.length + ' linked</span>'
+          : '<span class="text-dim text-sm">None</span>') + '</td>' +
+        '<td data-label="SEO">' + seoCell + '</td>' +
+        '<td data-label="Status"><span class="badge badge--' + (p.status === 'published' ? 'ok' : 'warn') + '">' +
+          FS.esc(p.status) + '</span></td>' +
+        '<td class="td-actions" data-label="Actions">' +
+          '<a class="btn btn-xs btn-outline" href="' + FS.url('blog-post.html?p=' + p.slug) + '" target="_blank" rel="noopener">' +
+            FS.icon('external') + 'View</a> ' +
+          '<a class="btn btn-xs btn-primary" href="' + FS.url('admin/blog-edit.html?p=' + p.slug) + '">' +
+            FS.icon('edit') + 'Edit</a> ' +
+          '<button class="btn btn-xs btn-outline" data-pdel="' + FS.esc(p.slug) + '">' + FS.icon('trash') + '</button>' +
+        '</td></tr>';
+    }
+
+    function wire() {
+      var search = document.getElementById('postSearch');
+      var t;
+      search.addEventListener('input', function () {
+        clearTimeout(t);
+        t = setTimeout(function () {
+          state.q = search.value;
+          render();
+          var again = document.getElementById('postSearch');
+          again.focus();
+          again.setSelectionRange(again.value.length, again.value.length);
+        }, 200);
+      });
+
+      FS.$$('[data-pfilter]', host).forEach(function (b) {
+        b.addEventListener('click', function () { state.filter = b.dataset.pfilter; render(); });
+      });
+
+      FS.$$('[data-pdel]', host).forEach(function (b) {
+        b.addEventListener('click', function () {
+          var p = Store.post(b.dataset.pdel);
+          FS.confirm('Delete "' + p.title + '"?',
+            'The article comes off the site and is removed from every "related articles" list.',
+            function () {
+              Store.deletePost(p.slug);
+              FS.toast('Article deleted', p.title, 'warn');
+              render();
+            }, true);
+        });
+      });
+
+      document.getElementById('newPost').addEventListener('click', function () {
+        var post = Store.createPost();
+        window.location.href = FS.url('admin/blog-edit.html?p=' + post.slug);
+      });
+
+      FS.hydrateIcons(host);
+    }
+  }
+
+  /* ----------------------------------------------------------------------
+     Blog editor — content, SEO and cross-links in one screen
+     ---------------------------------------------------------------------- */
+
+  function blogEdit() {
+    var slug = FS.param('p');
+    var post = Store.post(slug);
+
+    if (!post) {
+      host.innerHTML = '<div class="empty-state">' + FS.icon('file-text') +
+        '<h4>Article not found</h4><p>That article no longer exists.</p>' +
+        '<a class="btn btn-primary mt-6" href="' + FS.url('admin/blog.html') + '">Back to the blog</a></div>';
+      return;
+    }
+
+    render();
+
+    function render() {
+      var others = Store.posts().filter(function (p) { return p.slug !== post.slug; });
+
+      host.innerHTML =
+        '<nav class="crumbs crumbs--dark"><a href="' + FS.url('admin/blog.html') + '">Blog</a>' +
+          '<span>/</span><strong>' + FS.esc(post.title) + '</strong></nav>' +
+
+        '<div class="page-head"><div><h2>Edit article</h2>' +
+          '<p>/blog/' + FS.esc(post.slug) + ' · ' + FS.date(post.at, 'long') + '</p></div>' +
+          '<div class="page-head-actions">' +
+            '<a class="btn btn-outline" href="' + FS.url('blog-post.html?p=' + post.slug) + '" target="_blank" rel="noopener">' +
+              FS.icon('external') + 'Preview</a>' +
+            '<button class="btn btn-primary" id="beSave">' + FS.icon('check') + 'Save article</button>' +
+          '</div></div>' +
+
+        '<form id="beForm">' +
+        '<div class="dash-grid dash-grid--2-1">' +
+
+          /* --- Content ------------------------------------------------- */
+          '<div>' +
+            '<div class="card mb-5"><div class="card-head"><h3>Content</h3></div><div class="card-body">' +
+              '<div class="field"><label class="label" for="beTitle">Title</label>' +
+                '<input class="input" id="beTitle" name="title" value="' + FS.esc(post.title) + '"></div>' +
+              '<div class="field"><label class="label" for="beSlug">URL slug</label>' +
+                '<div class="row" style="gap:8px"><span class="text-dim text-sm">/blog/</span>' +
+                '<input class="input" id="beSlug" name="slug" value="' + FS.esc(post.slug) + '"></div>' +
+                '<p class="hint">Changing this changes the article address. Existing links will break.</p></div>' +
+              '<div class="field"><label class="label" for="beExcerpt">Standfirst / excerpt</label>' +
+                '<textarea class="textarea" id="beExcerpt" name="excerpt" style="min-height:80px">' +
+                FS.esc(post.excerpt) + '</textarea>' +
+                '<p class="hint">Shown on the blog index and on the homepage preview.</p></div>' +
+
+              '<div class="field"><label class="label" for="beBody">Article body</label>' +
+                '<div class="editor-tools">' +
+                  '<button type="button" class="btn btn-xs btn-outline" id="beLink">' + FS.icon('link') + 'Insert link</button>' +
+                  '<button type="button" class="btn btn-xs btn-outline" id="beArticleLink">' + FS.icon('file-text') + 'Link an article</button>' +
+                  '<span class="text-xs text-dim">One paragraph per blank line. ' +
+                    'Links use markdown: [text](https://…)</span>' +
+                '</div>' +
+                '<textarea class="textarea" id="beBody" name="body" style="min-height:340px">' +
+                FS.esc((post.body || []).join('\n\n')) + '</textarea></div>' +
+            '</div></div>' +
+
+            /* --- SEO ---------------------------------------------------- */
+            '<div class="card"><div class="card-head"><h3>Search engine listing</h3>' +
+              '<span class="text-sm text-muted" id="beSeoCount"></span></div><div class="card-body">' +
+              '<div class="serp-preview" id="beSerp"></div>' +
+              '<div class="field mt-5"><label class="label" for="beMetaTitle">Meta title</label>' +
+                '<input class="input" id="beMetaTitle" name="metaTitle" value="' + FS.esc(post.metaTitle || '') + '">' +
+                '<p class="hint">Aim for 50–60 characters.</p></div>' +
+              '<div class="field"><label class="label" for="beMetaDesc">Meta description</label>' +
+                '<textarea class="textarea" id="beMetaDesc" name="metaDescription" style="min-height:80px">' +
+                FS.esc(post.metaDescription || '') + '</textarea>' +
+                '<p class="hint">Aim for 140–160 characters.</p></div>' +
+              '<div class="field"><label class="label" for="beKeywords">Keywords</label>' +
+                '<input class="input" id="beKeywords" name="keywords" value="' + FS.esc(post.keywords || '') + '">' +
+                '<p class="hint">Comma separated.</p></div>' +
+            '</div></div>' +
+          '</div>' +
+
+          /* --- Right rail ---------------------------------------------- */
+          '<div>' +
+            '<div class="card mb-5"><div class="card-head"><h3>Publishing</h3></div><div class="card-body">' +
+              '<div class="field"><label class="label" for="beStatus">Status</label>' +
+                '<select class="select" id="beStatus" name="status">' +
+                  '<option value="published"' + (post.status === 'published' ? ' selected' : '') + '>Published</option>' +
+                  '<option value="draft"' + (post.status === 'draft' ? ' selected' : '') + '>Draft</option>' +
+                '</select></div>' +
+              '<div class="field"><label class="label" for="beCategory">Category</label>' +
+                '<select class="select" id="beCategory" name="category">' +
+                  D.postCategories.map(function (c) {
+                    return '<option' + (c === post.category ? ' selected' : '') + '>' + FS.esc(c) + '</option>';
+                  }).join('') + '</select></div>' +
+              '<div class="field"><label class="label" for="beAuthor">Author</label>' +
+                '<input class="input" id="beAuthor" name="author" value="' + FS.esc(post.author) + '"></div>' +
+              '<div class="field-row field-row-2">' +
+                '<div class="field"><label class="label" for="beDate">Published on</label>' +
+                  '<input class="input" id="beDate" name="at" type="date" value="' + FS.esc(String(post.at).slice(0, 10)) + '"></div>' +
+                '<div class="field"><label class="label" for="beRead">Read time (min)</label>' +
+                  '<input class="input" id="beRead" name="read" type="number" min="1" value="' + FS.esc(post.read) + '"></div>' +
+              '</div>' +
+              '<div class="field"><label class="label" for="beImage">Header image</label>' +
+                '<select class="select" id="beImage" name="image">' +
+                  D.services.map(function (s) {
+                    return '<option value="' + FS.esc(s.image) + '"' + (s.image === post.image ? ' selected' : '') + '>' +
+                      FS.esc(s.name) + '</option>';
+                  }).join('') + '</select></div>' +
+            '</div></div>' +
+
+            /* --- Article links ------------------------------------------ */
+            '<div class="card"><div class="card-head"><h3>Related articles</h3>' +
+              '<span class="badge badge--info">' + (post.related || []).length + '</span></div><div class="card-body">' +
+              '<p class="text-muted text-sm mb-4">Tick the articles to link from the bottom of this one. ' +
+                'They appear in the "Keep reading" rail on the live page.</p>' +
+              (others.length
+                ? '<div class="link-list">' + others.map(function (p) {
+                    var on = (post.related || []).indexOf(p.slug) > -1;
+                    return '<label class="link-item' + (on ? ' is-on' : '') + '">' +
+                      '<input type="checkbox" data-rel="' + FS.esc(p.slug) + '"' + (on ? ' checked' : '') + '>' +
+                      '<span><strong>' + FS.esc(p.title) + '</strong>' +
+                      '<small>' + FS.esc(p.category) + ' · ' + FS.date(p.at) + '</small></span></label>';
+                  }).join('') + '</div>'
+                : '<p class="text-dim text-sm">No other articles to link to yet.</p>') +
+            '</div></div>' +
+          '</div>' +
+        '</div></form>';
+
+      wire();
+    }
+
+    function wire() {
+      var title = document.getElementById('beTitle');
+      var metaTitle = document.getElementById('beMetaTitle');
+      var metaDesc = document.getElementById('beMetaDesc');
+      var slugField = document.getElementById('beSlug');
+
+      function paintSerp() {
+        var t = metaTitle.value || (title.value + ' | FleetSquad');
+        var d = metaDesc.value || document.getElementById('beExcerpt').value;
+        document.getElementById('beSerp').innerHTML =
+          '<div class="serp-url">fleetsquad.com › blog › ' + FS.esc(slugField.value) + '</div>' +
+          '<div class="serp-title">' + FS.esc(t.slice(0, 62)) + (t.length > 62 ? '…' : '') + '</div>' +
+          '<div class="serp-desc">' + FS.esc(d.slice(0, 165)) + (d.length > 165 ? '…' : '') + '</div>';
+        document.getElementById('beSeoCount').textContent =
+          'Title ' + t.length + '/60 · Description ' + d.length + '/160';
+      }
+
+      [title, metaTitle, metaDesc, slugField, document.getElementById('beExcerpt')].forEach(function (f) {
+        f.addEventListener('input', paintSerp);
+      });
+      paintSerp();
+
+      /* Link tools ---------------------------------------------------- */
+      document.getElementById('beLink').addEventListener('click', function () {
+        insertLinkModal(null);
+      });
+      document.getElementById('beArticleLink').addEventListener('click', function () {
+        insertLinkModal(Store.posts().filter(function (p) { return p.slug !== post.slug; }));
+      });
+
+      FS.$$('[data-rel]', host).forEach(function (box) {
+        box.addEventListener('change', function () {
+          box.closest('.link-item').classList.toggle('is-on', box.checked);
+        });
+      });
+
+      document.getElementById('beSave').addEventListener('click', save);
+      FS.hydrateIcons(host);
+    }
+
+    /** Drop a markdown link into the body at the caret. */
+    function insertLinkModal(articles) {
+      var body = document.getElementById('beBody');
+      var selected = body.value.slice(body.selectionStart, body.selectionEnd);
+
+      FS.modal({
+        title: articles ? 'Link to another article' : 'Insert a link',
+        subtitle: 'Added at the cursor position',
+        body:
+          (articles
+            ? '<div class="field"><label class="label" for="ilArticle">Article</label>' +
+              '<select class="select" id="ilArticle">' + articles.map(function (p) {
+                return '<option value="' + FS.esc(p.slug) + '" data-title="' + FS.esc(p.title) + '">' +
+                  FS.esc(p.title) + '</option>';
+              }).join('') + '</select></div>'
+            : '<div class="field"><label class="label" for="ilUrl">URL</label>' +
+              '<input class="input" id="ilUrl" placeholder="https://fleetsquad.com/services" ' +
+              'value="https://"></div>') +
+          '<div class="field"><label class="label" for="ilText">Link text</label>' +
+            '<input class="input" id="ilText" value="' + FS.esc(selected) + '" placeholder="the text readers click"></div>',
+        footer: '<button class="btn btn-outline" data-close>Cancel</button>' +
+                '<button class="btn btn-primary" id="ilGo">Insert link</button>',
+        onMount: function (root, close) {
+          var select = root.querySelector('#ilArticle');
+          var text = root.querySelector('#ilText');
+          if (select && !text.value) {
+            text.value = select.selectedOptions[0].dataset.title;
+            select.addEventListener('change', function () {
+              text.value = select.selectedOptions[0].dataset.title;
+            });
+          }
+          root.querySelector('#ilGo').addEventListener('click', function () {
+            var url = select ? '/blog-post.html?p=' + select.value : root.querySelector('#ilUrl').value;
+            var label = text.value || url;
+            var markdown = '[' + label + '](' + url + ')';
+            var start = body.selectionStart;
+            var end = body.selectionEnd;
+            body.value = body.value.slice(0, start) + markdown + body.value.slice(end);
+            body.focus();
+            body.setSelectionRange(start + markdown.length, start + markdown.length);
+            close();
+            FS.toast('Link inserted', label, 'ok');
+          });
+        }
       });
     }
-  };
+
+    function save() {
+      var f = FS.formData(document.getElementById('beForm'));
+      var related = FS.$$('[data-rel]:checked', host).map(function (b) { return b.dataset.rel; });
+      var newSlug = String(f.slug || post.slug).trim().toLowerCase().replace(/[^a-z0-9-]+/g, '-');
+
+      Store.savePost(post.slug, {
+        slug: newSlug,
+        title: f.title,
+        excerpt: f.excerpt,
+        body: String(f.body).split(/\n{2,}/).map(function (s) { return s.trim(); }).filter(Boolean),
+        status: f.status,
+        category: f.category,
+        author: f.author,
+        at: f.at ? new Date(f.at).toISOString() : post.at,
+        read: Number(f.read) || post.read,
+        image: f.image,
+        metaTitle: f.metaTitle,
+        metaDescription: f.metaDescription,
+        keywords: f.keywords,
+        related: related
+      });
+
+      post = Store.post(newSlug);
+      FS.toast('Article saved', post.title, 'ok');
+      // Keep the address bar in step when the slug changed.
+      if (newSlug !== slug) {
+        slug = newSlug;
+        window.history.replaceState({}, '', FS.url('admin/blog-edit.html?p=' + newSlug));
+      }
+      render();
+    }
+  }
+
+  /* ======================================================================
+     Service areas
+     Add a state, switch it on or off, and manage the counties and cities we
+     cover inside it. The public coverage page reads the same records.
+     ====================================================================== */
+
+  function serviceAreas() {
+    render();
+
+    function render() {
+      var areas = Store.serviceAreas();
+      var active = areas.filter(function (a) { return a.active; });
+      var cities = active.reduce(function (n, a) { return n + a.cities.length; }, 0);
+      var counties = active.reduce(function (n, a) { return n + (a.counties || []).length; }, 0);
+
+      host.innerHTML =
+        '<div class="page-head"><div><h2>Service Areas</h2>' +
+          '<p>The coverage behind the "check if we are in your area" page. ' +
+            'Switch a state off and it stops showing as covered on the site.</p></div>' +
+          '<div class="page-head-actions">' +
+            '<a class="btn btn-outline" href="' + FS.url('pages/service-areas.html') + '" target="_blank" rel="noopener">' +
+              FS.icon('external') + 'View page</a>' +
+            '<button class="btn btn-primary" id="addArea">' + FS.icon('plus') + 'Add state</button>' +
+          '</div></div>' +
+
+        Dash.kpiGrid([
+          { icon: 'map',     tone: 'navy', label: 'States covered', value: active.length },
+          { icon: 'map-pin',               label: 'Counties',       value: counties },
+          { icon: 'building',              label: 'Cities',         value: cities },
+          { icon: 'globe',   tone: 'warn', label: 'States inactive', value: areas.length - active.length }
+        ], 'kpi-grid--4') +
+
+        '<div class="grid grid-3">' + areas.map(card).join('') + '</div>';
+
+      wire();
+    }
+
+    function card(a) {
+      return '<div class="card card-pad' + (a.active ? '' : ' is-muted') + '">' +
+        '<div class="row-between mb-3">' +
+          '<h4 class="row" style="gap:8px;margin:0">' + FS.icon('map-pin') +
+            FS.esc(a.state) + ' <span class="chip">' + FS.esc(a.code) + '</span></h4>' +
+          '<span class="badge badge--' + (a.active ? 'ok' : 'neutral') + '">' +
+            (a.active ? 'Covered' : 'Not covered') + '</span>' +
+        '</div>' +
+        '<dl class="dl dl--2 mb-4">' +
+          '<div><dt>Counties</dt><dd>' + (a.counties || []).length + '</dd></div>' +
+          '<div><dt>Cities</dt><dd>' + a.cities.length + '</dd></div>' +
+        '</dl>' +
+        '<p class="text-muted text-sm mb-4">' +
+          FS.esc(a.cities.slice(0, 4).join(', ')) + (a.cities.length > 4 ? ' +' + (a.cities.length - 4) + ' more' : '') +
+        '</p>' +
+        '<div class="row row-wrap" style="gap:var(--sp-2)">' +
+          '<button class="btn btn-xs btn-primary" data-aedit="' + a.id + '">' + FS.icon('edit') + 'Edit</button>' +
+          '<button class="btn btn-xs btn-outline" data-atoggle="' + a.id + '">' +
+            FS.icon(a.active ? 'pause' : 'play') + (a.active ? 'Turn off' : 'Turn on') + '</button>' +
+          '<button class="btn btn-xs btn-outline" data-adel="' + a.id + '">' + FS.icon('trash') + '</button>' +
+        '</div></div>';
+    }
+
+    function wire() {
+      FS.$$('[data-aedit]', host).forEach(function (b) {
+        b.addEventListener('click', function () { areaModal(Store.serviceArea(b.dataset.aedit)); });
+      });
+      FS.$$('[data-atoggle]', host).forEach(function (b) {
+        b.addEventListener('click', function () {
+          var a = Store.serviceArea(b.dataset.atoggle);
+          Store.saveServiceArea(a.id, { active: !a.active });
+          FS.toast(a.active ? 'Coverage turned off' : 'Coverage turned on', a.state, a.active ? 'warn' : 'ok');
+          render();
+        });
+      });
+      FS.$$('[data-adel]', host).forEach(function (b) {
+        b.addEventListener('click', function () {
+          var a = Store.serviceArea(b.dataset.adel);
+          FS.confirm('Remove ' + a.state + '?', 'The state and all of its cities come off the coverage page.', function () {
+            Store.deleteServiceArea(a.id);
+            FS.toast('State removed', a.state, 'warn');
+            render();
+          }, true);
+        });
+      });
+      document.getElementById('addArea').addEventListener('click', function () { areaModal(null); });
+      FS.hydrateIcons(host);
+    }
+
+    function areaModal(area) {
+      var isNew = !area;
+      area = area || { state: '', code: '', counties: [], cities: [], active: true };
+
+      var used = Store.serviceAreas().map(function (a) { return a.code; });
+      var options = D.usStates
+        .filter(function (s) { return isNew ? used.indexOf(s[0]) < 0 : true; })
+        .map(function (s) {
+          return '<option value="' + s[0] + '"' + (s[0] === area.code ? ' selected' : '') + '>' + s[1] + '</option>';
+        }).join('');
+
+      FS.modal({
+        title: isNew ? 'Add a state' : 'Edit ' + area.state,
+        subtitle: 'Counties and cities we cover',
+        size: 'lg',
+        body: '<form id="saForm" novalidate>' +
+          '<div class="field-row field-row-2 mb-4">' +
+            '<div class="field"><label class="label" for="saState">State</label>' +
+              '<select class="select" id="saState">' + (options || '<option value="">All states added</option>') + '</select></div>' +
+            '<div class="field"><label class="label" for="saActive">Coverage</label>' +
+              '<select class="select" id="saActive">' +
+                '<option value="1"' + (area.active ? ' selected' : '') + '>We service this state</option>' +
+                '<option value="0"' + (!area.active ? ' selected' : '') + '>Not covered yet</option>' +
+              '</select></div>' +
+          '</div>' +
+          '<div class="field"><label class="label" for="saCounties">Counties</label>' +
+            '<textarea class="textarea" id="saCounties" style="min-height:90px" ' +
+            'placeholder="One per line">' + FS.esc((area.counties || []).join('\n')) + '</textarea>' +
+            '<p class="hint">One per line. Shown on the coverage page under the state.</p></div>' +
+          '<div class="field"><label class="label" for="saCities">Cities</label>' +
+            '<textarea class="textarea" id="saCities" style="min-height:130px" ' +
+            'placeholder="One per line">' + FS.esc(area.cities.join('\n')) + '</textarea>' +
+            '<p class="hint">One per line. These are what the zip / city search matches against.</p></div>' +
+        '</form>',
+        footer: '<button class="btn btn-outline" data-close>Cancel</button>' +
+                '<button class="btn btn-primary" id="saSave">' + (isNew ? 'Add state' : 'Save changes') + '</button>',
+        onMount: function (root, close) {
+          root.querySelector('#saSave').addEventListener('click', function () {
+            var code = root.querySelector('#saState').value;
+            if (!code) { FS.toast('Pick a state', '', 'warn'); return; }
+            var name = (D.usStates.filter(function (s) { return s[0] === code; })[0] || [])[1];
+
+            var patch = {
+              code: code,
+              state: name,
+              active: root.querySelector('#saActive').value === '1',
+              counties: lines(root.querySelector('#saCounties').value),
+              cities: lines(root.querySelector('#saCities').value)
+            };
+
+            if (isNew) Store.createServiceArea(patch);
+            else Store.saveServiceArea(area.id, patch);
+
+            close();
+            FS.toast(isNew ? 'State added' : 'Coverage updated', name, 'ok');
+            render();
+          });
+        }
+      });
+
+      function lines(text) {
+        return String(text).split('\n').map(function (s) { return s.trim(); }).filter(Boolean);
+      }
+    }
+  }
+
+  /* ======================================================================
+     Users — impersonation and password resets
+     ====================================================================== */
+
+  function users() {
+    Dash.usersView(host);
+  }
+
+  /* ======================================================================
+     Settings — what Stripe needs before payments go live
+     ====================================================================== */
+
+  function settings() {
+    render();
+
+    function render() {
+      var saved = Store.settings();
+      var stripe = saved.stripe || {};
+      var groups = [];
+      D.stripeSetup.forEach(function (f) {
+        if (groups.indexOf(f.group) < 0) groups.push(f.group);
+      });
+
+      var required = D.stripeSetup.filter(function (f) { return f.required; });
+      var filled = required.filter(function (f) { return stripe[f.key]; });
+      var pct = Math.round((filled.length / required.length) * 100);
+
+      host.innerHTML =
+        '<div class="page-head"><div><h2>Settings</h2>' +
+          '<p>What we need from your Stripe account before charges, payment links and payouts go live.</p></div>' +
+          '<div class="page-head-actions">' +
+            '<button class="btn btn-primary" id="stSave">' + FS.icon('check') + 'Save settings</button>' +
+          '</div></div>' +
+
+        '<div class="alert alert--info mb-6">' + FS.icon('info') +
+          '<div><strong>Nothing here is live yet.</strong> This build is front-end only: keys entered here are ' +
+          'held in your browser so the team can see exactly which values are needed. The secret key and the ' +
+          'webhook secret must only ever be set on the server — never in a browser build.</div></div>' +
+
+        '<div class="dash-grid dash-grid--2-1">' +
+          '<div>' +
+            '<div class="card mb-5"><div class="card-head"><h3>Stripe credentials</h3>' +
+              '<span class="badge badge--' + (pct === 100 ? 'ok' : 'warn') + '">' +
+                filled.length + ' of ' + required.length + ' required</span></div>' +
+              '<div class="card-body">' +
+                '<span class="progress mb-6" style="display:block"><span style="width:' + pct + '%"></span></span>' +
+                '<form id="stForm">' +
+                  '<div class="field"><label class="label" for="stMode">Mode</label>' +
+                    '<select class="select" id="stMode" name="stripeMode">' +
+                      '<option value="test"' + (saved.stripeMode === 'test' ? ' selected' : '') + '>Test — pk_test / sk_test</option>' +
+                      '<option value="live"' + (saved.stripeMode === 'live' ? ' selected' : '') + '>Live — real charges</option>' +
+                    '</select></div>' +
+                  groups.map(function (g) {
+                    return '<div class="divider"></div><h4 class="mb-4">' + FS.esc(g) + '</h4>' +
+                      D.stripeSetup.filter(function (f) { return f.group === g; }).map(field).join('');
+                  }).join('') +
+                '</form>' +
+              '</div></div>' +
+          '</div>' +
+
+          '<div>' +
+            '<div class="card mb-5"><div class="card-head"><h3>Also switch on in Stripe</h3></div><div class="card-body">' +
+              '<ul class="check-list">' + D.stripeChecklist.map(function (item) {
+                return '<li>' + FS.icon('check-circle') + '<span>' + FS.esc(item) + '</span></li>';
+              }).join('') + '</ul>' +
+            '</div></div>' +
+
+            '<div class="card"><div class="card-head"><h3>Where the money moves</h3></div><div class="card-body">' +
+              '<ol class="flow-list">' +
+                '<li><strong>Customer pays</strong><span>Card taken on New Sale, a manual charge on a project, or a Stripe payment link emailed from the invoice.</span></li>' +
+                '<li><strong>Stripe confirms</strong><span>The webhook tells us the payment succeeded, and the project flips to Paid on its own.</span></li>' +
+                '<li><strong>FleetSquad is paid out</strong><span>Stripe settles to the bank account on the Stripe profile, on your payout schedule.</span></li>' +
+                '<li><strong>Mechanic is paid</strong><span>Recorded on the project. Through Stripe Connect if the client ID above is set, otherwise outside the platform.</span></li>' +
+              '</ol>' +
+            '</div></div>' +
+          '</div>' +
+        '</div>';
+
+      document.getElementById('stSave').addEventListener('click', function () {
+        var f = FS.formData(document.getElementById('stForm'));
+        var next = {};
+        D.stripeSetup.forEach(function (field) { next[field.key] = f[field.key] || ''; });
+        Store.saveSettings({
+          stripe: next,
+          stripeMode: f.stripeMode,
+          stripeConnected: D.stripeSetup.filter(function (x) { return x.required; })
+            .every(function (x) { return next[x.key]; })
+        });
+        FS.toast('Settings saved', 'Held in this browser only.', 'ok');
+        render();
+      });
+
+      FS.hydrateIcons(host);
+
+      function field(f) {
+        var value = stripe[f.key] || '';
+        return '<div class="field">' +
+          '<label class="label" for="st_' + f.key + '">' + FS.esc(f.label) +
+            (f.required ? ' <span class="req">*</span>' : ' <span class="text-dim text-xs">(optional)</span>') + '</label>' +
+          '<input class="input" id="st_' + f.key + '" name="' + f.key + '" ' +
+            'type="' + (f.secret ? 'password' : 'text') + '" ' +
+            'placeholder="' + FS.esc(f.placeholder) + '" value="' + FS.esc(value) + '" autocomplete="off">' +
+          '<p class="hint"><strong>Where:</strong> ' + FS.esc(f.where) + '<br>' +
+            '<strong>Why:</strong> ' + FS.esc(f.why) + '</p>' +
+        '</div>';
+      }
+    }
+  }
 
   /* ======================================================================
      Dispatch
@@ -1280,7 +2108,12 @@
     'payments': payments,
     'reviews': reviews,
     'notifications': notifications,
-    'cms': cms
+    'cms': cms,
+    'blog': blog,
+    'blog-edit': blogEdit,
+    'service-areas': serviceAreas,
+    'users': users,
+    'settings': settings
   };
 
   function init() {

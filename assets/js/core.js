@@ -102,6 +102,35 @@
       .map(function (w) { return w[0]; }).join('').toUpperCase();
   };
 
+  /**
+   * Clock-in / clock-out times are stored as 24-hour "HH:MM" because that is
+   * what <input type="time"> produces. Everywhere they are *displayed* they go
+   * through here and come back as 12-hour with AM/PM.
+   * @param {string} hhmm e.g. "16:05"
+   * @returns {string} e.g. "4:05 PM"
+   */
+  FS.time12 = function (hhmm) {
+    if (!hhmm) return '—';
+    var parts = String(hhmm).split(':');
+    var h = Number(parts[0]);
+    var m = String(parts[1] == null ? '00' : parts[1]).slice(0, 2);
+    if (isNaN(h)) return hhmm;
+    var suffix = h >= 12 ? 'PM' : 'AM';
+    var h12 = h % 12;
+    if (h12 === 0) h12 = 12;
+    return h12 + ':' + m.padStart(2, '0') + ' ' + suffix;
+  };
+
+  /** Decimal hours as "7h 30m", which reads better than "7.5 h". */
+  FS.duration = function (hours) {
+    var h = Number(hours) || 0;
+    if (!h) return '—';
+    var whole = Math.floor(h);
+    var mins = Math.round((h - whole) * 60);
+    if (mins === 60) { whole += 1; mins = 0; }
+    return (whole ? whole + 'h ' : '') + (mins ? mins + 'm' : (whole ? '' : '0m')).trim();
+  };
+
   /** Difference between two "HH:MM" clock strings, in decimal hours. */
   FS.hoursBetween = function (start, end) {
     if (!start || !end) return 0;
