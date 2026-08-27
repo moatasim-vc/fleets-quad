@@ -104,12 +104,17 @@
     'sparkles':      '<path d="M12 2.5 13.8 8 19 9.8 13.8 11.6 12 17 10.2 11.6 5 9.8 10.2 8z"/><path d="M18.5 15 19.4 17.6 22 18.5 19.4 19.4 18.5 22 17.6 19.4 15 18.5 17.6 17.6z"/>',
     'play':          '<polygon points="6 3.5 20 12 6 20.5"/>',
     'pause':         '<rect x="6" y="4" width="4" height="16" rx="1"/><rect x="14" y="4" width="4" height="16" rx="1"/>',
+    'volume':        '<polygon points="4 9 8 9 13 4.5 13 19.5 8 15 4 15"/><path d="M16.5 8.8a4.5 4.5 0 0 1 0 6.4"/><path d="M19.2 6.1a8.3 8.3 0 0 1 0 11.8"/>',
+    'stop':          '<rect x="5" y="5" width="14" height="14" rx="2"/>',
     'facebook':      '<path d="M18 2h-3a5 5 0 0 0-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 0 1 1-1h3z"/>',
-    'instagram':     '<rect x="2" y="2" width="20" height="20" rx="5.5"/><circle cx="12" cy="12" r="4.2"/><line x1="17.6" y1="6.4" x2="17.61" y2="6.4"/>'
+    'instagram':     '<rect x="2" y="2" width="20" height="20" rx="5.5"/><circle cx="12" cy="12" r="4.2"/><line x1="17.6" y1="6.4" x2="17.61" y2="6.4"/>',
+    /* The play triangle is a second subpath knocked out with evenodd, so the
+       icon stays a single currentColor shape on any background. */
+    'youtube':       '<path fill-rule="evenodd" d="M21.6 7.2a2.6 2.6 0 0 0-1.8-1.8C18.2 5 12 5 12 5s-6.2 0-7.8.4a2.6 2.6 0 0 0-1.8 1.8A27 27 0 0 0 2 12a27 27 0 0 0 .4 4.8 2.6 2.6 0 0 0 1.8 1.8C5.8 19 12 19 12 19s6.2 0 7.8-.4a2.6 2.6 0 0 0 1.8-1.8A27 27 0 0 0 22 12a27 27 0 0 0-.4-4.8zM10 15.2V8.8l5.2 3.2z"/>'
   };
 
   /* Icons drawn with a fill rather than a stroke. */
-  var SOLID = { star: 1, facebook: 1, play: 1, sparkles: 1, 'thumbs-up': 1, shield: 1, phone: 1 };
+  var SOLID = { star: 1, facebook: 1, youtube: 1, play: 1, sparkles: 1, 'thumbs-up': 1, shield: 1, phone: 1 };
 
   /**
    * Build an inline SVG string.

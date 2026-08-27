@@ -136,8 +136,10 @@
             brand() +
             '<p>Mobile fleet maintenance powered by ASE Master Techs. We come to you so your fleet keeps moving.</p>' +
             '<div class="footer-social">' +
-              '<a href="#" aria-label="FleetSquad on Facebook">' + FS.icon('facebook') + '</a>' +
-              '<a href="#" aria-label="FleetSquad on Instagram">' + FS.icon('instagram') + '</a>' +
+              C.social.map(function (s) {
+                return '<a href="' + s.href + '" target="_blank" rel="noopener" ' +
+                  'aria-label="FleetSquad on ' + FS.esc(s.label) + '">' + FS.icon(s.icon) + '</a>';
+              }).join('') +
             '</div>' +
           '</div>' +
           '<div class="footer-col"><h5>Services</h5><ul>' + services + '</ul></div>' +

@@ -41,7 +41,12 @@
     hours: 'Everyday 9am to 9pm',
     network: 'Network 24-7',
     parent: 'Mechlance Inc Company',
-    year: new Date().getFullYear()
+    year: new Date().getFullYear(),
+    /* Footer social links. Add an entry here and it appears in the footer. */
+    social: [
+      { icon: 'facebook', label: 'Facebook', href: 'https://www.facebook.com/fleetsquad' },
+      { icon: 'youtube',  label: 'YouTube',  href: 'https://www.youtube.com/@FleetSquad' }
+    ]
   };
 
   /* Live-ish counters for the homepage. */
@@ -900,6 +905,9 @@
       a: 'Class 1 through Class 8 — passenger cars, pickups, service vans, box trucks and semi-trucks. Our technicians hold ASE Master certification and are qualified across gasoline, diesel and hybrid drivetrains.' }
   ];
 
+  /* The partner cards on /pages/partners.html. These are editable from
+     Admin → CMS Pages → Partners, so every field here is only the starting
+     point — an admin can add, reorder by adding, edit or remove any of them. */
   D.partners = [
     { name: 'Penske',     logo: 'assets/img/brands/penske.png',     type: 'Fleet Operator',   text: 'Nationwide truck leasing and logistics partner across 14 metro service areas.' },
     { name: 'Ryder',      logo: 'assets/img/brands/ryder.png',      type: 'Fleet Operator',   text: 'Scheduled maintenance and roadside coverage for regional distribution fleets.' },
@@ -908,6 +916,9 @@
     { name: 'Enterprise', logo: 'assets/img/brands/enterprise.png', type: 'Rental Network',   text: 'Corporate pool vehicle programmes with consolidated billing.' },
     { name: 'U-Haul',     logo: 'assets/img/brands/uhaul.png',      type: 'Fleet Operator',   text: 'Box truck and trailer service supporting high-cycle rental operations.' }
   ];
+
+  /* A stable id so the editor can address a row after the list is reordered. */
+  D.partners.forEach(function (p, i) { p.id = p.id || 'PTR-' + (101 + i); });
 
   D.jobs = [
     { title: 'ASE Master Technician — Mobile',  dept: 'Field Operations', location: 'New York, NY',      type: 'Full-time', text: 'Run your own mobile service unit across our New York territory. ASE Master certification and five years of heavy-duty experience required.' },

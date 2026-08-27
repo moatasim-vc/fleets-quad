@@ -49,19 +49,21 @@
   function contactBlock() {
     return section(
       '<div class="grid grid-3">' +
-        contactCard('phone-ring', 'Call dispatch', C.phone, 'tel:' + C.phoneRaw, C.hours) +
-        contactCard('mail', 'Email us', C.email, 'mailto:' + C.email, 'We reply within one business hour') +
-        contactCard('globe', 'Coverage', C.network, FS.url('pages/service-areas.html'), '16 states · 80+ metro areas') +
+        contactCard('phone-ring', 'Call dispatch', C.phone, '', C.hours) +
+        contactCard('mail', 'Email us', C.email, '', 'We reply within one business hour') +
+        contactCard('globe', 'Coverage', C.network, '', '16 states · 80+ metro areas') +
       '</div>', '', 'padding-top:0');
   }
 
   function contactCard(icon, label, value, href, sub) {
-    return '<a class="feature card-hover" href="' + href + '">' +
+    var tag = href ? 'a' : 'div';
+    return '<' + tag + ' class="feature' + (href ? ' card-hover' : '') + '"' +
+      (href ? ' href="' + href + '"' : '') + '>' +
       '<i>' + FS.icon(icon) + '</i>' +
       '<div><h4>' + FS.esc(label) + '</h4>' +
         '<p class="text-blue text-bold">' + FS.esc(value) + '</p>' +
         '<p class="text-xs text-dim mt-2">' + FS.esc(sub) + '</p></div>' +
-    '</a>';
+    '</' + tag + '>';
   }
 
   function featureGrid(features) {
@@ -102,9 +104,15 @@
     meta('name', 'twitter:card', 'summary_large_image');
     meta('name', 'twitter:title', seo.title);
     meta('name', 'twitter:description', seo.description);
-    if (seo.image) {
-      meta('property', 'og:image', 'https://www.fleetsquad.com/' + seo.image.replace(/^\//, ''));
-      meta('name', 'twitter:image', 'https://www.fleetsquad.com/' + seo.image.replace(/^\//, ''));
+    // An image an admin uploaded is a data: URL held in this browser. It shows
+    // on the page, but a share card has to point at something fetchable, so it
+    // is left off rather than published as a broken address.
+    if (seo.image && !/^data:/.test(seo.image)) {
+      var img = /^https?:/.test(seo.image)
+        ? seo.image
+        : 'https://www.fleetsquad.com/' + seo.image.replace(/^\//, '');
+      meta('property', 'og:image', img);
+      meta('name', 'twitter:image', img);
     }
 
     function meta(attr, key, value) {
@@ -411,13 +419,10 @@
       path: 'blog'
     });
 
-    var cats = ['All'].concat(D.postCategories).map(function (c) {
-      return '<a class="filter-pill' + (c === active ? ' is-active' : '') + '" href="' +
-        FS.url('blog.html' + (c === 'All' ? '' : '?cat=' + encodeURIComponent(c))) + '">' + FS.esc(c) + '</a>';
-    }).join('');
-
+    /* No category row above the grid — the client asked for the articles on
+       their own. A ?cat= link still filters, so a category can be linked to
+       from elsewhere, it just is not advertised here. */
     body.innerHTML = section(
-      '<div class="filters mb-8">' + cats + '</div>' +
       (shown.length
         ? '<div class="grid grid-3">' + shown.map(postCard).join('') + '</div>'
         : '<div class="empty-state">' + FS.icon('file-text') + '<h4>No posts yet</h4><p>Nothing published in this category.</p></div>')
@@ -445,12 +450,24 @@
       type: 'article'
     });
 
+    var canSpeak = FS.speech.supported();
+
     setHero(p.title, p.excerpt,
       [{ label: 'Home', href: 'index.html' }, { label: 'Blog', href: 'blog.html' }, { label: p.category }],
       '<div class="row row-wrap mt-6" style="gap:var(--sp-5);color:rgba(255,255,255,.8);font-size:var(--fs-sm)">' +
         '<span class="row" style="gap:8px">' + FS.icon('user') + FS.esc(p.author) + '</span>' +
         '<span class="row" style="gap:8px">' + FS.icon('calendar') + FS.date(p.at, 'long') + '</span>' +
         '<span class="row" style="gap:8px">' + FS.icon('clock') + p.read + ' min read</span>' +
+        // Sits in the royal-blue hero, immediately after the read time.
+        (canSpeak
+          ? '<span class="voice-group">' +
+              '<button type="button" class="voice-pill" data-voice-toggle>' +
+                '<span class="voice-ico" data-voice-icon>' + FS.icon('volume') + '</span>' +
+                '<span data-voice-label>Voice</span></button>' +
+              '<button type="button" class="voice-pill voice-pill--stop" data-voice-stop hidden ' +
+                'aria-label="Stop reading">' + FS.icon('stop') + '</button>' +
+            '</span>'
+          : '') +
       '</div>');
 
     /* The articles an editor linked in the admin come first; if none were
@@ -470,7 +487,9 @@
       section(
         '<div class="split split--2-1" style="gap:var(--sp-8)">' +
           '<article>' +
-            '<img src="' + FS.url(p.image) + '" alt="" style="border-radius:var(--r-lg);width:100%;margin-bottom:var(--sp-7)">' +
+            // .article-hero fixes the frame at 16:9 and crops to fill, so any
+            // header image an admin uploads lands the same size on every post.
+            '<img class="article-hero" src="' + FS.url(p.image) + '" alt="' + FS.esc(p.title) + '">' +
             '<div class="prose">' + p.body.map(function (para) { return '<p>' + paragraph(para) + '</p>'; }).join('') + '</div>' +
             (related.length
               ? '<div class="divider"></div>' +
@@ -485,20 +504,28 @@
               tags.map(function (t) { return '<span class="chip">' + FS.esc(t) + '</span>'; }).join('') +
             '</div>' +
           '</article>' +
+          // No call-to-action card under the details any more — the page
+          // already ends on one, and stacking two reads as filler.
           '<aside>' +
-            '<div class="card mb-5"><div class="card-body">' +
+            '<div class="card"><div class="card-body">' +
               '<h4 class="mb-3">Article details</h4>' +
               '<dl class="dl">' +
                 '<div><dt>Author</dt><dd>' + FS.esc(p.author) + '</dd></div>' +
                 '<div><dt>Published</dt><dd>' + FS.date(p.at, 'long') + '</dd></div>' +
                 '<div><dt>Category</dt><dd>' + FS.esc(p.category) + '</dd></div>' +
                 '<div><dt>Reading time</dt><dd>' + p.read + ' minutes</dd></div>' +
+                // Directly under the read time, as the second place to listen.
+                (canSpeak
+                  ? '<div><dt>Listen</dt><dd>' +
+                      '<span class="voice-group">' +
+                        '<button type="button" class="btn btn-sm btn-outline" data-voice-toggle>' +
+                          '<span class="voice-ico" data-voice-icon>' + FS.icon('volume') + '</span>' +
+                          '<span data-voice-label>Read aloud</span></button>' +
+                        '<button type="button" class="btn btn-sm btn-outline" data-voice-stop hidden ' +
+                          'aria-label="Stop reading">' + FS.icon('stop') + '</button>' +
+                      '</span></dd></div>'
+                  : '') +
               '</dl>' +
-            '</div></div>' +
-            '<div class="card"><div class="card-body">' +
-              '<h4 class="mb-3">Need a hand with your fleet?</h4>' +
-              '<p class="text-muted text-sm mb-5">Free estimate, no obligation. We come to you.</p>' +
-              '<a class="btn btn-primary btn-block" href="' + FS.url('get-estimate.html') + '">Get Estimate</a>' +
             '</div></div>' +
           '</aside>' +
         '</div>') +
@@ -507,6 +534,47 @@
         related.slice(0, 3).map(postCard).join('') + '</div>',
         '', 'padding-top:0;background:var(--surface-2)') +
       ctaBlock();
+
+    if (canSpeak) wireVoice([p.title].concat(p.body || []).join('\n\n'));
+  }
+
+  /**
+   * Bind every read-aloud control on the page to one shared voice.
+   * The hero button and the one in Article details stay in step because both
+   * listen to the same FS.speech state rather than tracking their own.
+   * @param {string} text the article, already flattened to plain text
+   */
+  function wireVoice(text) {
+    var toggles = FS.$$('[data-voice-toggle]');
+    var stops = FS.$$('[data-voice-stop]');
+    if (!toggles.length) return;
+
+    var LABEL = { idle: 'Voice', playing: 'Pause', paused: 'Resume' };
+    var ICON = { idle: 'volume', playing: 'pause', paused: 'play' };
+
+    function paint(status) {
+      toggles.forEach(function (b) {
+        var label = b.querySelector('[data-voice-label]');
+        var ico = b.querySelector('[data-voice-icon]');
+        // The sidebar button spells it out; the hero pill stays short.
+        if (label) label.textContent = status === 'idle' && b.closest('.dl')
+          ? 'Read aloud' : LABEL[status];
+        if (ico) ico.innerHTML = FS.icon(ICON[status]);
+        b.classList.toggle('is-active', status !== 'idle');
+        b.setAttribute('aria-pressed', status === 'playing' ? 'true' : 'false');
+      });
+      stops.forEach(function (b) { b.hidden = status === 'idle'; });
+    }
+
+    toggles.forEach(function (b) {
+      b.addEventListener('click', function () { FS.speech.toggle(text); });
+    });
+    stops.forEach(function (b) {
+      b.addEventListener('click', function () { FS.speech.stop(); });
+    });
+
+    FS.speech.onChange(paint);
+    paint(FS.speech.state());
   }
 
   /* ======================================================================
@@ -649,14 +717,22 @@
 
   function partnersPage() {
     applyCmsPage('partners');
+    // The cards come from the store, so anything an admin adds or edits in
+    // CMS Pages → Partners shows here on the next load.
+    var partners = Store.partners();
     body.innerHTML =
-      section('<div class="grid grid-3">' + D.partners.map(function (p) {
-        return '<div class="card card-pad text-center">' +
-          '<img src="' + FS.url(p.logo) + '" alt="' + FS.esc(p.name) + '" style="height:56px;width:auto;margin:0 auto var(--sp-5);opacity:.62" loading="lazy">' +
-          '<span class="chip mb-3">' + FS.esc(p.type) + '</span>' +
-          '<h3 class="mb-2">' + FS.esc(p.name) + '</h3>' +
-          '<p class="text-muted text-sm">' + FS.esc(p.text) + '</p></div>';
-      }).join('') + '</div>') +
+      section(partners.length
+        ? '<div class="grid grid-3">' + partners.map(function (p) {
+            return '<div class="card card-pad text-center">' +
+              (p.logo
+                ? '<img class="partner-logo" src="' + FS.url(p.logo) + '" alt="' + FS.esc(p.name) + '" loading="lazy">'
+                : '<span class="partner-logo partner-logo--empty">' + FS.esc(FS.initials(p.name)) + '</span>') +
+              (p.type ? '<span class="chip mb-3">' + FS.esc(p.type) + '</span>' : '') +
+              '<h3 class="mb-2">' + FS.esc(p.name) + '</h3>' +
+              (p.text ? '<p class="text-muted text-sm">' + FS.esc(p.text) + '</p>' : '') + '</div>';
+          }).join('') + '</div>'
+        : '<div class="empty-state">' + FS.icon('users') +
+          '<h4>No partners listed yet</h4><p>Partners added in the admin appear here.</p></div>') +
 
       section(headBlock('Partner with FleetSquad', 'Running a network that needs consistent mobile maintenance across multiple markets? Let us talk.') +
         '<div class="text-center"><a class="btn btn-primary btn-lg" href="' + FS.url('pages/contact.html') + '">Talk to partnerships</a></div>',
@@ -772,7 +848,7 @@
     body.innerHTML =
       section(
         '<div style="max-width:820px;margin-inline:auto">' +
-          D.faqs.map(function (f, i) {
+          Store.faqs().map(function (f, i) {
             return '<div class="faq-item' + (i === 0 ? ' is-open' : '') + '">' +
               '<button class="faq-q" data-accordion aria-expanded="' + (i === 0) + '">' +
                 FS.esc(f.q) + FS.icon('plus') + '</button>' +
@@ -793,7 +869,18 @@
      Admin → Service Areas changes this page immediately. */
   function serviceAreasPage() {
     var page = applyCmsPage('service-areas') || {};
+    var allAreas = Store.serviceAreas();
     var covered = Store.serviceAreas(true);
+    var areaByCode = {};
+    allAreas.forEach(function (area) { areaByCode[area.code] = area; });
+    var mapPositions = {
+      AK:[1,1], WA:[1,3], MT:[1,5], ND:[1,7], MN:[1,8], WI:[1,9], MI:[1,10], VT:[1,11], NH:[1,12], ME:[1,13],
+      OR:[2,3], ID:[2,4], WY:[2,5], SD:[2,7], IA:[2,8], IL:[2,9], IN:[2,10], OH:[2,11], PA:[2,12], NY:[2,13], MA:[2,14],
+      NV:[3,3], UT:[3,4], CO:[3,5], NE:[3,7], MO:[3,8], KY:[3,10], WV:[3,11], VA:[3,12], MD:[3,13], NJ:[3,14], CT:[3,15], RI:[3,16],
+      CA:[4,3], AZ:[4,4], NM:[4,5], KS:[4,7], AR:[4,8], TN:[4,10], NC:[4,12], DE:[4,13],
+      HI:[5,1], TX:[5,6], OK:[5,7], LA:[5,8], MS:[5,9], AL:[5,10], GA:[5,11], SC:[5,12],
+      FL:[6,12]
+    };
     var cities = covered.reduce(function (s, a) { return s + a.cities.length; }, 0);
     var counties = covered.reduce(function (s, a) { return s + (a.counties || []).length; }, 0);
 
@@ -824,6 +911,30 @@
           '<div id="areaResult" role="status"></div>' +
         '</div>' +
 
+        '<div class="coverage-map card card-pad mb-8">' +
+          '<div class="row-between row-wrap mb-5" style="gap:var(--sp-4)">' +
+            '<div><h3 class="mb-1">Our United States coverage</h3>' +
+              '<p class="text-muted text-sm mb-0">Hover over a state, or tap it, to see cities and counties.</p></div>' +
+            '<div class="coverage-legend" aria-label="Map legend">' +
+              '<span><i class="is-covered"></i>We service</span>' +
+              '<span><i class="is-coming"></i>Not covered yet</span>' +
+            '</div>' +
+          '</div>' +
+          '<div class="usa-map-scroll"><div class="usa-map" role="group" aria-label="United States service coverage">' +
+            D.usStates.map(function (state) {
+              var code = state[0];
+              var area = areaByCode[code];
+              var coveredHere = !!(area && area.active);
+              var pos = mapPositions[code];
+              return '<button type="button" class="usa-state ' + (coveredHere ? 'is-covered' : 'is-coming') + '" ' +
+                'data-map-state="' + code + '" style="--map-row:' + pos[0] + ';--map-col:' + pos[1] + '" ' +
+                'aria-label="' + FS.esc(state[1]) + (coveredHere ? ', serviced' : ', not covered yet') + '">' +
+                '<strong>' + code + '</strong><span>' + FS.esc(state[1]) + '</span></button>';
+            }).join('') +
+          '</div></div>' +
+          '<div class="coverage-detail" id="coverageDetail" aria-live="polite"></div>' +
+        '</div>' +
+
         '<div class="field" style="max-width:420px;margin:0 auto var(--sp-6)">' +
           '<div class="input-icon">' + FS.icon('search') +
           '<input class="input" id="areaSearch" placeholder="Filter the list below…" aria-label="Filter service areas"></div>' +
@@ -849,6 +960,7 @@
       ) + ctaBlock();
 
     wireCheck();
+    wireMap();
     wireFilter();
 
     function kpi(value, label) {
@@ -893,7 +1005,41 @@
           card.classList.add('is-hit');
           card.scrollIntoView({ block: 'center', behavior: 'smooth' });
         }
+        var stateButton = document.querySelector('[data-map-state="' + hit.area.code + '"]');
+        if (stateButton) stateButton.click();
       });
+    }
+
+    function wireMap() {
+      var detail = document.getElementById('coverageDetail');
+      var buttons = FS.$$('[data-map-state]');
+
+      function show(code) {
+        var state = D.usStates.filter(function (item) { return item[0] === code; })[0];
+        var area = areaByCode[code];
+        var active = !!(area && area.active);
+        buttons.forEach(function (button) {
+          button.classList.toggle('is-selected', button.dataset.mapState === code);
+        });
+        detail.innerHTML = active
+          ? '<div class="coverage-detail-head"><div><span class="badge badge--ok">We service this state</span>' +
+              '<h4>' + FS.esc(state[1]) + '</h4></div><strong>' + FS.esc(code) + '</strong></div>' +
+            '<div class="coverage-detail-grid"><div><span>Cities and metros</span><p>' +
+              FS.esc(area.cities.join(', ') || 'Coverage available statewide') + '</p></div>' +
+              '<div><span>Counties</span><p>' +
+              FS.esc((area.counties || []).join(', ') || 'Contact us for county availability') + '</p></div></div>'
+          : '<div class="coverage-detail-head"><div><span class="badge badge--neutral">Not covered yet</span>' +
+              '<h4>' + FS.esc(state[1]) + '</h4></div><strong>' + FS.esc(code) + '</strong></div>' +
+            '<p class="text-muted mb-0">We do not currently list service cities or counties in this state. ' +
+              '<a href="' + FS.url('pages/contact.html') + '">Tell us where you need coverage</a>.</p>';
+      }
+
+      buttons.forEach(function (button) {
+        button.addEventListener('mouseenter', function () { show(button.dataset.mapState); });
+        button.addEventListener('focus', function () { show(button.dataset.mapState); });
+        button.addEventListener('click', function () { show(button.dataset.mapState); });
+      });
+      show(covered[0] ? covered[0].code : 'AL');
     }
 
     function wireFilter() {

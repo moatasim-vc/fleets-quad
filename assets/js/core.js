@@ -30,7 +30,8 @@
   /** Turn a project-relative path into one that works from any folder depth. */
   FS.url = function (path) {
     if (!path) return FS.base;
-    if (/^(https?:|mailto:|tel:|#)/.test(path)) return path;
+    // data:/blob: cover images an admin uploaded — they are already complete.
+    if (/^(https?:|data:|blob:|mailto:|tel:|#)/.test(path)) return path;
     return FS.base + path.replace(/^\//, '');
   };
 
@@ -441,6 +442,155 @@
       });
     }, { threshold: 0.08 });
     io.observe(node);
+  };
+
+  /* ------------------------------------------------------------------------
+     Read aloud
+     Wraps the browser's own speech synthesiser. Nothing leaves the device and
+     no audio file is involved — the voice is the one already installed on the
+     reader's machine, so this costs nothing to run and needs no backend.
+
+     Two quirks are worked around here:
+       · Chrome silently stops after roughly fifteen seconds of one utterance,
+         so the text is cut into sentence-sized chunks and queued.
+       · Chrome also drops a *paused* queue after a while, so a heartbeat
+         nudges resume() while playing.
+
+     Any number of buttons can drive the same engine: subscribe with
+     FS.speech.onChange(fn) and read FS.speech.state().
+     ------------------------------------------------------------------------ */
+  FS.speech = (function () {
+    var synth = window.speechSynthesis;
+    var ok = !!synth && typeof window.SpeechSynthesisUtterance === 'function';
+    var listeners = [];
+    var status = 'idle';           /* idle | playing | paused */
+    var queue = [];
+    var at = 0;
+    var beat = null;
+
+    function emit(next) {
+      status = next;
+      listeners.forEach(function (fn) { try { fn(status); } catch (e) {} });
+    }
+
+    /* Split on sentence ends, then hard-wrap anything still too long.
+       A marker character is used instead of a lookbehind so the file still
+       parses on older Safari, which only learned lookbehind in 16.4. */
+    function chunk(text) {
+      var out = [];
+      String(text).replace(/([.!?])\s+/g, '$1\u0001').split(/[\u0001\n]+/).forEach(function (s) {
+        s = s.trim();
+        if (!s) return;
+        while (s.length > 220) {
+          var cut = s.lastIndexOf(' ', 220);
+          out.push(s.slice(0, cut > 60 ? cut : 220));
+          s = s.slice(cut > 60 ? cut + 1 : 220);
+        }
+        if (s) out.push(s);
+      });
+      return out;
+    }
+
+    function heartbeat(on) {
+      if (beat) { clearInterval(beat); beat = null; }
+      if (on) beat = setInterval(function () {
+        if (status === 'playing' && synth.paused) synth.resume();
+      }, 8000);
+    }
+
+    function speakNext() {
+      if (at >= queue.length) { stop(); return; }
+      var u = new window.SpeechSynthesisUtterance(queue[at]);
+      u.rate = 1;
+      u.pitch = 1;
+      u.lang = document.documentElement.lang || 'en-US';
+      u.onend = function () { at++; speakNext(); };
+      u.onerror = function () { stop(); };
+      synth.speak(u);
+    }
+
+    function start(text) {
+      if (!ok) return;
+      synth.cancel();
+      queue = chunk(text);
+      at = 0;
+      if (!queue.length) return;
+      emit('playing');
+      heartbeat(true);
+      speakNext();
+    }
+
+    function stop() {
+      if (!ok) return;
+      queue = [];
+      at = 0;
+      heartbeat(false);
+      synth.cancel();
+      emit('idle');
+    }
+
+    /* Speech survives a page change in some browsers — silence it on the way
+       out so the reader is not followed to the next article. */
+    if (ok) window.addEventListener('pagehide', function () { synth.cancel(); });
+
+    return {
+      supported: function () { return ok; },
+      state: function () { return status; },
+      onChange: function (fn) { listeners.push(fn); return fn; },
+      offChange: function (fn) {
+        var i = listeners.indexOf(fn);
+        if (i > -1) listeners.splice(i, 1);
+      },
+      play: start,
+      stop: stop,
+      /** Play, pause or resume depending on where we are. */
+      toggle: function (text) {
+        if (!ok) return;
+        if (status === 'playing') { synth.pause(); heartbeat(false); emit('paused'); }
+        else if (status === 'paused') { synth.resume(); heartbeat(true); emit('playing'); }
+        else start(text);
+      }
+    };
+  })();
+
+  /* ------------------------------------------------------------------------
+     Image upload
+     Reads a picked file, scales it down and hands back a data URL. Without a
+     backend the picture has to live inside the saved state, so it is capped at
+     a sensible width and re-encoded as JPEG to keep localStorage viable.
+     ------------------------------------------------------------------------ */
+  FS.readImage = function (file, maxW, done) {
+    if (!file || !/^image\//.test(file.type)) { done(null, 'That file is not an image.'); return; }
+    var reader = new FileReader();
+    reader.onerror = function () { done(null, 'That file could not be read.'); };
+    reader.onload = function () {
+      var img = new Image();
+      img.onerror = function () { done(null, 'That image could not be decoded.'); };
+      img.onload = function () {
+        var w = img.naturalWidth || img.width;
+        var h = img.naturalHeight || img.height;
+        var scale = Math.min(1, (maxW || 1600) / w);
+        var canvas = document.createElement('canvas');
+        canvas.width = Math.round(w * scale);
+        canvas.height = Math.round(h * scale);
+        var ctx = canvas.getContext('2d');
+        if (!ctx) { done(String(reader.result)); return; }
+        // A white ground keeps transparent PNGs from turning black as JPEG.
+        ctx.fillStyle = '#fff';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+        var keepAlpha = file.type === 'image/png' || file.type === 'image/svg+xml';
+        var url;
+        try {
+          url = keepAlpha && canvas.width * canvas.height < 640000
+            ? canvas.toDataURL('image/png')
+            : canvas.toDataURL('image/jpeg', 0.82);
+        } catch (e) { url = String(reader.result); }
+        done(url, null, { width: canvas.width, height: canvas.height, bytes: url.length });
+      };
+      img.src = String(reader.result);
+    };
+    reader.readAsDataURL(file);
   };
 
   /* ------------------------------------------------------------------------

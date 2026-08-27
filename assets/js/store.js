@@ -39,6 +39,8 @@
       posts:         clone(FS.data.posts),
       serviceAreas:  clone(FS.data.serviceAreas),
       cmsPages:      clone(FS.data.cmsPages),
+      partners:      clone(FS.data.partners),
+      faqs:          clone(FS.data.faqs),
       credentials:   credentials,
       settings:      { stripe: {}, stripeMode: 'test', stripeConnected: false },
       estimates:     [],
@@ -53,19 +55,41 @@
   try {
     var raw = window.localStorage.getItem(KEY);
     state = raw ? JSON.parse(raw) : seed();
-    // A missing collection means the seed shape changed — start clean.
-    if (!state.orders || !state.customers || !state.posts || !state.serviceAreas) state = seed();
+    // The core collections missing means the saved shape is unusable — start
+    // clean. A *newly added* collection is filled in from the seed instead, so
+    // a demo that has already been edited keeps the edits.
+    if (!state.orders || !state.customers || !state.posts || !state.serviceAreas) {
+      state = seed();
+    } else {
+      var fresh = seed();
+      Object.keys(fresh).forEach(function (k) {
+        if (state[k] === undefined) state[k] = fresh[k];
+      });
+    }
   } catch (e) {
     state = seed();
   }
 
+  /**
+   * Mirror the state to disk.
+   * @returns {boolean} false when the browser refused it — a full quota or a
+   *   private window. The caller can then tell the user rather than letting an
+   *   apparently successful save vanish on the next page load.
+   */
   function persist() {
-    try { window.localStorage.setItem(KEY, JSON.stringify(state)); }
-    catch (e) { /* private mode / quota — the prototype still works in memory */ }
+    try {
+      window.localStorage.setItem(KEY, JSON.stringify(state));
+      return true;
+    } catch (e) {
+      return false; /* private mode / quota — the prototype still works in memory */
+    }
   }
 
   var Store = FS.store = {
     state: state,
+
+    /* Set by every write that can plausibly be refused for size. */
+    lastWriteOk: true,
 
     /** Wipe every local change and return to the shipped mock data. */
     reset: function () {
@@ -262,7 +286,10 @@
       var p = Store.post(slug);
       if (!p) return null;
       Object.assign(p, patch);
-      persist();
+      // An uploaded header image is carried inside the record, so a save can
+      // legitimately be refused for size. Store.lastWriteOk lets the editor
+      // report that instead of showing a success it cannot honour.
+      Store.lastWriteOk = persist();
       return p;
     },
 
@@ -369,6 +396,54 @@
       Object.assign(p, patch, { updated: new Date().toISOString() });
       persist();
       return p;
+    },
+
+    faqs: function () { return state.faqs; },
+
+    saveFaqs: function (list) {
+      state.faqs = list.map(function (faq) {
+        return { q: faq.q, a: faq.a };
+      });
+      return persist();
+    },
+
+    /* ----------------------------------------------------------------------
+       Partners
+       The cards on the public Partners page. Edited inside the CMS Pages
+       modal for that page, so the copy and the cards are saved together.
+       ---------------------------------------------------------------------- */
+
+    partners: function () { return state.partners; },
+
+    partner: function (id) {
+      return state.partners.filter(function (p) { return p.id === id; })[0] || null;
+    },
+
+    /**
+     * Replace the whole partner list in one go. The editor rebuilds the array
+     * from its rows, which keeps the order the admin sees and the order the
+     * public page renders identical.
+     * @param {Array<{id:string,name:string,logo:string,type:string,text:string}>} list
+     * @returns {boolean} whether the change reached localStorage
+     */
+    savePartners: function (list) {
+      state.partners = list.map(function (p, i) {
+        return {
+          id:   p.id || 'PTR-' + Date.now() + '-' + i,
+          name: p.name,
+          logo: p.logo,
+          type: p.type,
+          text: p.text
+        };
+      });
+      return persist();
+    },
+
+    newPartner: function () {
+      return {
+        id: 'PTR-' + Date.now() + '-' + Math.floor(Math.random() * 1000),
+        name: '', logo: '', type: '', text: ''
+      };
     },
 
     /* ----------------------------------------------------------------------

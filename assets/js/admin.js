@@ -1365,7 +1365,16 @@
             var descLen = (p.metaDescription || '').length;
             var seoOk = titleLen >= 25 && titleLen <= 62 && descLen >= 90 && descLen <= 165;
             return '<tr>' +
-              '<td data-label="Page" class="td-strong">' + FS.esc(p.title) + '</td>' +
+              '<td data-label="Page" class="td-strong">' + FS.esc(p.title) +
+                // Partners is the one page whose cards are edited here too —
+                // say so, otherwise nobody would think to open it.
+                (p.slug === 'partners'
+                  ? '<br><small class="text-xs text-dim">' + Store.partners().length +
+                    ' partner cards</small>'
+                  : p.slug === 'faqs'
+                    ? '<br><small class="text-xs text-dim">' + Store.faqs().length +
+                      ' questions</small>'
+                  : '') + '</td>' +
               '<td data-label="Address"><code class="text-sm text-dim">/' + FS.esc(p.slug) + '</code></td>' +
               '<td data-label="Meta title"><span class="text-sm">' + FS.esc(p.metaTitle || '—') + '</span><br>' +
                 '<small class="text-xs ' + (seoOk ? 'text-ok' : 'text-dim') + '">' +
@@ -1400,6 +1409,18 @@
     }
 
     function editModal(p) {
+      /* The Partners page is the one CMS page that carries a repeating list as
+         well as copy, so its cards are edited in this same dialog. Rows are
+         held in a working copy and only committed on Save. */
+      var isPartners = p.slug === 'partners';
+      var isFaqs = p.slug === 'faqs';
+      var rows = isPartners
+        ? Store.partners().map(function (x) { return Object.assign({}, x); })
+        : [];
+      var faqRows = isFaqs
+        ? Store.faqs().map(function (x) { return Object.assign({}, x); })
+        : [];
+
       FS.modal({
         title: 'Edit: ' + p.title,
         subtitle: '/' + p.slug,
@@ -1428,6 +1449,27 @@
               '<option value="published"' + (p.status === 'published' ? ' selected' : '') + '>published</option>' +
               '<option value="draft"' + (p.status === 'draft' ? ' selected' : '') + '>draft</option>' +
             '</select></div>' +
+          (isPartners
+            ? '<div class="divider"></div>' +
+              '<div class="row-between mb-3">' +
+                '<h4 class="mb-0">Partners on this page</h4>' +
+                '<button type="button" class="btn btn-sm btn-outline" id="cmAddPartner">' +
+                  FS.icon('plus') + 'Add partner</button>' +
+              '</div>' +
+              '<p class="text-muted text-sm mb-4">Each one is a card on the live Partners page. ' +
+                'Upload a logo or paste its address — any shape works, the card sizes it.</p>' +
+              '<div class="repeater" id="cmPartners"></div>'
+            : '') +
+          (isFaqs
+            ? '<div class="divider"></div>' +
+              '<div class="row-between mb-3">' +
+                '<h4 class="mb-0">Questions on this page</h4>' +
+                '<button type="button" class="btn btn-sm btn-outline" id="cmAddFaq">' +
+                  FS.icon('plus') + 'Add question</button>' +
+              '</div>' +
+              '<p class="text-muted text-sm mb-4">Add, edit or remove the questions shown on the live FAQs page.</p>' +
+              '<div class="repeater" id="cmFaqs"></div>'
+            : '') +
         '</form>',
         footer: '<button class="btn btn-outline" data-close>Cancel</button>' +
                 '<button class="btn btn-primary" id="cmSave">Save page</button>',
@@ -1442,14 +1484,199 @@
           desc.addEventListener('input', count);
           count();
 
+          if (isPartners) {
+            paintPartners(root);
+            root.querySelector('#cmAddPartner').addEventListener('click', function () {
+              collectPartners(root);
+              rows.push(Store.newPartner());
+              paintPartners(root);
+              var last = root.querySelector('#cmPartners .repeat-item:last-child [data-pname]');
+              if (last) last.focus();
+            });
+          }
+
+          if (isFaqs) {
+            paintFaqs(root);
+            root.querySelector('#cmAddFaq').addEventListener('click', function () {
+              collectFaqs(root);
+              faqRows.push({ q: '', a: '' });
+              paintFaqs(root);
+              var last = root.querySelector('#cmFaqs .repeat-item:last-child [data-fquestion]');
+              if (last) last.focus();
+            });
+          }
+
           root.querySelector('#cmSave').addEventListener('click', function () {
+            if (isPartners) {
+              collectPartners(root);
+              // A row with nothing in it is a row the admin abandoned.
+              var keep = rows.filter(function (r) { return r.name || r.text || r.logo; });
+              if (!Store.savePartners(keep)) {
+                FS.toast('Not enough room to save', 'The uploaded logos are larger than this ' +
+                  'browser will hold. Use smaller files or fewer of them.', 'warn');
+                return;
+              }
+            }
+            if (isFaqs) {
+              collectFaqs(root);
+              var savedFaqs = faqRows.filter(function (faq) { return faq.q || faq.a; });
+              if (!Store.saveFaqs(savedFaqs)) {
+                FS.toast('Could not save FAQs', 'This browser could not store the changes.', 'warn');
+                return;
+              }
+            }
             Store.saveCmsPage(p.slug, FS.formData(root.querySelector('#cmsForm')));
             close();
-            FS.toast('Page saved', p.title, 'ok');
+            FS.toast('Page saved', isPartners ? p.title + ' · ' + rows.length + ' partners' : p.title, 'ok');
             render();
           });
         }
       });
+
+      /* --- Partner repeater ------------------------------------------- */
+
+      /** Pull what is typed in the rows back into the working copy. */
+      function collectPartners(root) {
+        FS.$$('#cmPartners .repeat-item', root).forEach(function (el) {
+          var row = rows[Number(el.dataset.i)];
+          if (!row) return;
+          row.name = el.querySelector('[data-pname]').value.trim();
+          row.type = el.querySelector('[data-ptype]').value.trim();
+          row.text = el.querySelector('[data-ptext]').value.trim();
+          // Uploaded rows show a note instead of an address box; their logo
+          // already lives in the working copy and must not be wiped here.
+          var url = el.querySelector('[data-plogo-url]');
+          if (url) row.logo = url.value.trim();
+        });
+      }
+
+      function paintPartners(root) {
+        var host = root.querySelector('#cmPartners');
+        host.innerHTML = rows.length
+          ? rows.map(partnerRow).join('')
+          : '<p class="text-dim text-sm">No partners yet. Add the first one above.</p>';
+        FS.hydrateIcons(host);
+
+        FS.$$('[data-premove]', host).forEach(function (b) {
+          b.addEventListener('click', function () {
+            collectPartners(root);
+            rows.splice(Number(b.closest('.repeat-item').dataset.i), 1);
+            paintPartners(root);
+          });
+        });
+
+        FS.$$('[data-plogo-file]', host).forEach(function (input) {
+          input.addEventListener('change', function () {
+            var i = Number(input.closest('.repeat-item').dataset.i);
+            // A logo only ever renders at 56px tall, so 480px wide is generous
+            // and keeps the saved state small.
+            FS.readImage(input.files[0], 480, function (url, err) {
+              if (err) { FS.toast('Could not use that file', err, 'warn'); return; }
+              collectPartners(root);
+              rows[i].logo = url;
+              paintPartners(root);
+              FS.toast('Logo attached', rows[i].name || 'New partner', 'ok');
+            });
+          });
+        });
+
+        FS.$$('[data-plogo-url]', host).forEach(function (input) {
+          input.addEventListener('change', function () {
+            var thumb = input.closest('.repeat-item').querySelector('.logo-preview');
+            thumb.innerHTML = input.value
+              ? '<img src="' + FS.esc(FS.url(input.value)) + '" alt="">'
+              : FS.icon('image');
+          });
+        });
+
+        FS.$$('[data-pclear]', host).forEach(function (b) {
+          b.addEventListener('click', function () {
+            var i = Number(b.closest('.repeat-item').dataset.i);
+            collectPartners(root);
+            rows[i].logo = '';
+            paintPartners(root);
+          });
+        });
+      }
+
+      function partnerRow(pt, i) {
+        // A data: URL is hundreds of characters long, so the address box shows
+        // a short stand-in rather than filling itself with base64.
+        var uploaded = /^data:/.test(pt.logo || '');
+        return '<div class="repeat-item" data-i="' + i + '">' +
+          '<div class="repeat-media">' +
+            '<span class="logo-preview">' +
+              (pt.logo ? '<img src="' + FS.esc(FS.url(pt.logo)) + '" alt="">' : FS.icon('image')) +
+            '</span>' +
+            '<label class="btn btn-xs btn-outline btn-file">' + FS.icon('upload') + 'Logo' +
+              '<input type="file" accept="image/*" data-plogo-file></label>' +
+          '</div>' +
+          '<div class="repeat-fields">' +
+            '<div class="field-row field-row-2">' +
+              '<div class="field"><span class="label">Title</span>' +
+                '<input class="input" data-pname aria-label="Partner title" ' +
+                'value="' + FS.esc(pt.name || '') + '" placeholder="Partner name"></div>' +
+              '<div class="field"><span class="label">Label</span>' +
+                '<input class="input" data-ptype aria-label="Partner label" ' +
+                'value="' + FS.esc(pt.type || '') + '" placeholder="Fleet Operator"></div>' +
+            '</div>' +
+            '<div class="field"><span class="label">Description</span>' +
+              '<textarea class="textarea" data-ptext aria-label="Partner description" style="min-height:64px" ' +
+                'placeholder="One or two lines about the partnership.">' + FS.esc(pt.text || '') + '</textarea></div>' +
+            (uploaded
+              ? '<p class="hint mb-0">' + FS.icon('image') + ' Uploaded image. ' +
+                'Attach another to replace it, or <button type="button" class="link-btn" ' +
+                'data-pclear>clear it</button>.</p>'
+              : '<div class="field mb-0"><span class="label">Logo address</span>' +
+                '<input class="input" data-plogo-url aria-label="Logo address" ' +
+                'value="' + FS.esc(pt.logo || '') + '" ' +
+                'placeholder="assets/img/brands/example.png"></div>') +
+          '</div>' +
+          '<button type="button" class="btn btn-xs btn-danger repeat-remove" data-premove ' +
+            'aria-label="Remove partner">' + FS.icon('trash') + '</button>' +
+        '</div>';
+      }
+
+      /* --- FAQ repeater ----------------------------------------------- */
+
+      function collectFaqs(root) {
+        FS.$$('#cmFaqs .repeat-item', root).forEach(function (el) {
+          var row = faqRows[Number(el.dataset.i)];
+          if (!row) return;
+          row.q = el.querySelector('[data-fquestion]').value.trim();
+          row.a = el.querySelector('[data-fanswer]').value.trim();
+        });
+      }
+
+      function paintFaqs(root) {
+        var list = root.querySelector('#cmFaqs');
+        list.innerHTML = faqRows.length
+          ? faqRows.map(faqRow).join('')
+          : '<p class="text-dim text-sm">No questions yet. Add the first one above.</p>';
+        FS.hydrateIcons(list);
+        FS.$$('[data-fremove]', list).forEach(function (button) {
+          button.addEventListener('click', function () {
+            collectFaqs(root);
+            faqRows.splice(Number(button.closest('.repeat-item').dataset.i), 1);
+            paintFaqs(root);
+          });
+        });
+      }
+
+      function faqRow(faq, i) {
+        return '<div class="repeat-item" data-i="' + i + '">' +
+          '<div class="repeat-fields">' +
+            '<div class="field"><span class="label">Question</span>' +
+              '<input class="input" data-fquestion aria-label="FAQ question" value="' +
+                FS.esc(faq.q || '') + '" placeholder="Enter a question"></div>' +
+            '<div class="field mb-0"><span class="label">Answer</span>' +
+              '<textarea class="textarea" data-fanswer aria-label="FAQ answer" style="min-height:90px" ' +
+                'placeholder="Enter the answer">' + FS.esc(faq.a || '') + '</textarea></div>' +
+          '</div>' +
+          '<button type="button" class="btn btn-xs btn-danger repeat-remove" data-fremove ' +
+            'aria-label="Remove question">' + FS.icon('trash') + '</button>' +
+        '</div>';
+      }
     }
   }
 
@@ -1684,12 +1911,34 @@
                 '<div class="field"><label class="label" for="beRead">Read time (min)</label>' +
                   '<input class="input" id="beRead" name="read" type="number" min="1" value="' + FS.esc(post.read) + '"></div>' +
               '</div>' +
-              '<div class="field"><label class="label" for="beImage">Header image</label>' +
-                '<select class="select" id="beImage" name="image">' +
-                  D.services.map(function (s) {
-                    return '<option value="' + FS.esc(s.image) + '"' + (s.image === post.image ? ' selected' : '') + '>' +
-                      FS.esc(s.name) + '</option>';
-                  }).join('') + '</select></div>' +
+              /* Header image. The value that counts lives in the hidden field;
+                 upload, library and address all write into it. Whatever goes
+                 in is cropped to the same 16:9 frame on the live article and
+                 to the card frame on the index, so no two posts come out a
+                 different shape. */
+              '<div class="field"><span class="label">Header image</span>' +
+                '<div class="img-picker">' +
+                  '<span class="img-preview" id="beImgPreview">' +
+                    (post.image ? '<img src="' + FS.esc(FS.url(post.image)) + '" alt="">' : FS.icon('image')) +
+                  '</span>' +
+                  '<div class="img-picker-tools">' +
+                    '<label class="btn btn-sm btn-outline btn-file">' + FS.icon('upload') + 'Upload image' +
+                      '<input type="file" accept="image/*" id="beImgFile"></label>' +
+                    '<select class="select" id="beImgLibrary">' +
+                      '<option value="">Or pick from the library…</option>' +
+                      D.services.map(function (s) {
+                        return '<option value="' + FS.esc(s.image) + '"' +
+                          (s.image === post.image ? ' selected' : '') + '>' + FS.esc(s.name) + '</option>';
+                      }).join('') + '</select>' +
+                  '</div>' +
+                '</div>' +
+                '<input type="hidden" id="beImage" name="image" value="' + FS.esc(post.image || '') + '">' +
+                '<div class="field mt-4 mb-0"><label class="label" for="beImgUrl">Or paste an address</label>' +
+                  '<input class="input" id="beImgUrl" ' +
+                  'value="' + FS.esc(/^data:/.test(post.image || '') ? '' : (post.image || '')) + '" ' +
+                  'placeholder="assets/img/services/example.jpg"></div>' +
+                '<p class="hint" id="beImgHint">Landscape works best. Any size is fine — it is ' +
+                  'resized on upload and cropped to a 16:9 frame.</p></div>' +
             '</div></div>' +
 
             /* --- Article links ------------------------------------------ */
@@ -1747,6 +1996,51 @@
         box.addEventListener('change', function () {
           box.closest('.link-item').classList.toggle('is-on', box.checked);
         });
+      });
+
+      /* Header image ---------------------------------------------------- */
+      var image = document.getElementById('beImage');
+      var preview = document.getElementById('beImgPreview');
+      var hint = document.getElementById('beImgHint');
+      var urlField = document.getElementById('beImgUrl');
+      var library = document.getElementById('beImgLibrary');
+
+      function setImage(value, note) {
+        image.value = value || '';
+        preview.innerHTML = value
+          ? '<img src="' + FS.esc(FS.url(value)) + '" alt="">'
+          : FS.icon('image');
+        FS.hydrateIcons(preview);
+        if (note) hint.textContent = note;
+      }
+
+      document.getElementById('beImgFile').addEventListener('change', function () {
+        var file = this.files[0];
+        if (!file) return;
+        // 1600px is more than the widest frame the article ever renders at,
+        // and keeps a typical photo well under 300 KB once re-encoded.
+        FS.readImage(file, 1600, function (url, err, info) {
+          if (err) { FS.toast('Could not use that file', err, 'warn'); return; }
+          setImage(url, info.width + '×' + info.height + ' · about ' +
+            Math.round(info.bytes / 1024) + ' KB. Save the article to keep it.');
+          urlField.value = '';
+          library.value = '';
+          if (info.bytes > 900000) {
+            FS.toast('That is a large image', 'It will save, but a few more this size ' +
+              'may fill the browser store. A smaller file is safer.', 'warn');
+          }
+        });
+      });
+
+      library.addEventListener('change', function () {
+        if (!this.value) return;
+        setImage(this.value, 'From the image library.');
+        urlField.value = this.value;
+      });
+
+      urlField.addEventListener('input', function () {
+        setImage(this.value.trim(), 'Loaded from an address.');
+        library.value = '';
       });
 
       document.getElementById('beSave').addEventListener('click', save);
@@ -1823,7 +2117,12 @@
       });
 
       post = Store.post(newSlug);
-      FS.toast('Article saved', post.title, 'ok');
+      if (!Store.lastWriteOk) {
+        FS.toast('Saved, but not kept', 'This browser refused the write — usually a header ' +
+          'image too large for the store. The change is live until you reload.', 'warn');
+      } else {
+        FS.toast('Article saved', post.title, 'ok');
+      }
       // Keep the address bar in step when the slug changed.
       if (newSlug !== slug) {
         slug = newSlug;

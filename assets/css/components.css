@@ -175,6 +175,33 @@
 .chip--active { background: var(--blue-050); border-color: var(--blue-100); color: var(--blue-600); }
 
 /* --------------------------------------------------------------------------
+   Partner card logo
+   A fixed box with contain, so an uploaded logo of any proportion sits on the
+   same baseline as the rest of the row.
+   -------------------------------------------------------------------------- */
+
+.partner-logo {
+  display: block;
+  height: 56px;
+  width: auto;
+  max-width: 78%;
+  object-fit: contain;
+  margin: 0 auto var(--sp-5);
+  opacity: .62;
+}
+.partner-logo--empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 56px;
+  border-radius: var(--r-md);
+  background: var(--surface-3);
+  color: var(--ink-400);
+  font-weight: 800;
+  opacity: 1;
+}
+
+/* --------------------------------------------------------------------------
    Forms
    -------------------------------------------------------------------------- */
 
@@ -229,10 +256,30 @@
   background-size: 17px;
 }
 
+/* Filter pills. These live here rather than in dashboard.css because the
+   public reviews page uses them too, and it never loads dashboard.css. */
+/* Filter pill row */
+.filters { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 2px; scrollbar-width: none; }
+.filters::-webkit-scrollbar { display: none; }
+.filter-pill {
+  padding: 7px 14px;
+  border-radius: var(--r-pill);
+  border: 1px solid var(--line);
+  background: var(--surface);
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  color: var(--ink-600);
+  white-space: nowrap;
+  transition: all var(--transition);
+}
+.filter-pill:hover { border-color: var(--blue-500); color: var(--blue-600); }
+.filter-pill.is-active { background: var(--navy-800); border-color: var(--navy-800); color: #fff; }
+
 /* A button that has to read as a select (the gated homepage range picker). */
 .select-btn { text-align: left; cursor: pointer; }
 
 .hint { margin-top: 6px; font-size: var(--fs-xs); color: var(--ink-400); }
+.hint svg { width: 13px; height: 13px; vertical-align: -2px; }
 .error-text { margin-top: 6px; font-size: var(--fs-xs); color: var(--danger); font-weight: 600; }
 .input.is-error, .select.is-error, .textarea.is-error { border-color: var(--danger); }
 
