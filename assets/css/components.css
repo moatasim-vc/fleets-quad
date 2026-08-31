@@ -329,6 +329,58 @@
 .opt-card.is-selected { border-color: var(--blue-600); background: var(--blue-050); }
 .opt-card strong { display: block; color: var(--ink-900); font-size: var(--fs-base); }
 .opt-card span { font-size: var(--fs-sm); color: var(--ink-500); }
+.opt-card-contact { display: block; font-size: var(--fs-xs); color: var(--ink-400); margin-top: 2px; }
+
+/* --------------------------------------------------------------------------
+   Search box above a list (assign-mechanic step, and anywhere else a roster
+   needs narrowing before you pick from it)
+   -------------------------------------------------------------------------- */
+
+.list-search { position: relative; display: block; }
+.list-search .input { padding-left: 40px; padding-right: 108px; }
+.list-search-ico {
+  position: absolute; left: 13px; top: 50%;
+  transform: translateY(-50%);
+  display: flex;
+  color: var(--ink-400);
+  pointer-events: none;
+}
+.list-search-ico svg { width: 17px; height: 17px; }
+.list-search-count {
+  position: absolute; right: 13px; top: 50%;
+  transform: translateY(-50%);
+  font-size: var(--fs-xs);
+  color: var(--ink-400);
+  pointer-events: none;
+  white-space: nowrap;
+}
+/* Safari draws its own clear button on type="search"; hide it so it does not
+   collide with the count. */
+.list-search .input::-webkit-search-cancel-button { display: none; }
+
+.empty-state--sm { padding: var(--sp-6) var(--sp-5); }
+.empty-state--sm svg { width: 28px; height: 28px; }
+
+/* --------------------------------------------------------------------------
+   Google Maps embed
+   A plain iframe in a fixed frame — no API key and no script to load.
+   -------------------------------------------------------------------------- */
+
+.map-embed {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  background: var(--surface-3);
+  overflow: hidden;
+}
+.map-embed iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; display: block; }
+@supports not (aspect-ratio: 4 / 3) { .map-embed { height: 320px; } }
+@media (min-width: 768px) {
+  .map-embed { aspect-ratio: 16 / 6; }
+  @supports not (aspect-ratio: 16 / 6) { .map-embed { height: 420px; } }
+}
 
 /* Toggle switch */
 .switch { position: relative; display: inline-block; width: 42px; height: 24px; flex: none; }
@@ -853,12 +905,6 @@ body.modal-open { overflow: hidden; }
 }
 .ref-badge small { font-size: var(--fs-xs); text-transform: uppercase; letter-spacing: .1em; color: rgba(255, 255, 255, .6); font-weight: 700; }
 .ref-badge strong { font-size: 1.6rem; letter-spacing: .02em; font-family: var(--font-mono); }
-
-/* Coverage card highlighted by the "check your area" lookup. */
-.area-card.is-hit {
-  border-color: var(--blue-600);
-  box-shadow: 0 0 0 3px var(--blue-050);
-}
 
 /* Inline "read next" list inside an article body. */
 .inline-links { display: grid; gap: 8px; }

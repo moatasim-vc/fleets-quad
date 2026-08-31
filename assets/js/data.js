@@ -882,6 +882,73 @@
       keywords: 'terms of service, fleet repair terms' }
   ];
 
+  /* ----------------------------------------------------------------------
+     Editable page bodies
+     The four pages the client asked to be able to rewrite carry their copy as
+     a list of sections instead of markup, so Admin → CMS Pages can edit them.
+     `style: 'quote'` renders as a pull quote; anything else is prose, and a
+     blank line inside `text` starts a new paragraph. Markdown links work.
+     ---------------------------------------------------------------------- */
+  D.pageBlocks = {
+    about: [
+      { heading: '', style: 'text', text:
+        'FleetSquad exists because of a simple observation: a vehicle that has to be driven to maintenance is a vehicle that is already costing you money. Every mile to a shop, every hour in a waiting bay and every rental replacement is time your fleet is not earning.\n\n' +
+        'We started in 2016 with one ASE Master Technician and one service van. Today we run a nationwide network of mobile technicians, a 24-7 dispatch desk and a platform that keeps every inspection, photograph and invoice attached to the vehicle it belongs to.' },
+      { heading: 'What we believe', style: 'text', text:
+        'Maintenance should be scheduled, documented and invisible to the people who depend on the vehicle. Our job is to make the fleet manager\'s week quieter, not busier.' },
+      { heading: '', style: 'quote', text:
+        'The hundred-thousandth work order closed on a box truck in Newark, at 4:40am, in the rain. That is the job.' }
+    ],
+
+    contact: [
+      { heading: '', style: 'text', text:
+        'Call dispatch for anything urgent, or send the form and a coordinator replies within one business hour. Tell us the vehicles, the location and what the unit is doing, and we can usually quote from that.' }
+    ],
+
+    privacy: [
+      { heading: 'Information we collect', style: 'text', text:
+        'We collect the contact and fleet details you provide when you request an estimate or create an account: name, company, phone number, email address, service address and the vehicle information needed to perform the work.' },
+      { heading: 'How we use it', style: 'text', text:
+        'To schedule and perform your service, to send you project updates by SMS and email, to invoice you, and to maintain the maintenance and compliance record attached to each vehicle.' },
+      { heading: 'Sharing', style: 'text', text:
+        'We share your information with the technician assigned to your project and with our payment processor. We do not sell customer data.' },
+      { heading: 'Retention', style: 'text', text:
+        'Maintenance and inspection records are retained for the period required by federal and state regulation. You may request deletion of everything not subject to a retention requirement.' },
+      { heading: 'Your choices', style: 'text', text:
+        'You can opt out of marketing messages at any time. Transactional messages about an active project cannot be disabled while the project is open.' },
+      { heading: 'Contact', style: 'text', text:
+        'Questions about this policy can be sent to ' + D.company.email + '.' }
+    ],
+
+    terms: [
+      { heading: 'Services', style: 'text', text:
+        'FleetSquad provides mobile fleet maintenance, repair, diagnostic and inspection services at the location you specify. Scope and pricing are confirmed in a written estimate that you approve before work begins.' },
+      { heading: 'Estimates and authorisation', style: 'text', text:
+        'No work is performed without your authorisation. A final invoice may not exceed an approved estimate without your written agreement to the additional scope.' },
+      { heading: 'Access and safety', style: 'text', text:
+        'You are responsible for providing safe and lawful access to the vehicles, including keys, gate codes and a work area that meets applicable safety requirements.' },
+      { heading: 'Warranty', style: 'text', text:
+        'Parts and labour carry a 12-month / 12,000-mile warranty. Warranty service is performed at the vehicle. The warranty does not cover damage from misuse, accident or unauthorised repair.' },
+      { heading: 'Payment', style: 'text', text:
+        'Invoices are due on the terms stated on the invoice. Accounts on a monthly agreement receive one consolidated invoice per period.' },
+      { heading: 'Limitation of liability', style: 'text', text:
+        'Our liability for any claim is limited to the amount paid for the service giving rise to the claim.' }
+    ]
+  };
+
+  /* Attach the bodies to their page records, and give Contact its map. The
+     map is a plain Google embed — no API key, no account, nothing to bill. */
+  D.cmsPages.forEach(function (p) {
+    if (D.pageBlocks[p.slug]) p.blocks = D.pageBlocks[p.slug];
+    if (p.slug === 'privacy' || p.slug === 'terms') p.showUpdated = true;
+  });
+  D.cmsPages.forEach(function (p) {
+    if (p.slug !== 'contact') return;
+    p.mapAddress = 'New York, NY';
+    p.mapEmbed = '';
+    p.mapLabel = 'Where we are';
+  });
+
   D.faqs = [
     { q: 'How quickly can a technician reach my location?',
       a: 'Emergency roadside requests are dispatched immediately and the average on-scene time across our service areas is under 90 minutes. Standard repair and maintenance requests marked ASAP are typically assigned within the hour and scheduled the same or next day.' },

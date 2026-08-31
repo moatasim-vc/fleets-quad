@@ -621,3 +621,35 @@ body.is-impersonating .sidebar { top: 42px; height: calc(100dvh - 42px); }
   .img-picker { flex-direction: column; }
   .img-preview { width: 100%; }
 }
+
+/* --------------------------------------------------------------------------
+   Page body sections (About / Contact / Privacy / Terms in the CMS dialog)
+   -------------------------------------------------------------------------- */
+
+.repeat-item--block { padding-right: var(--sp-4); }
+.repeat-item--block .repeat-fields { order: 1; }
+.repeat-actions {
+  order: 2;
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  align-self: flex-start;
+}
+.repeat-actions .btn { padding: 6px 8px; }
+.repeat-actions .btn[disabled] { opacity: .38; pointer-events: none; }
+.repeat-actions svg { width: 14px; height: 14px; }
+/* A pull quote carries no heading of its own. */
+.repeat-item--block.is-quote .block-heading-field { opacity: .4; pointer-events: none; }
+
+/* Map preview inside the CMS dialog */
+.map-embed--preview { aspect-ratio: 16 / 9; margin-top: var(--sp-2); }
+.map-empty {
+  position: absolute; inset: 0;
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  gap: 8px;
+  color: var(--ink-400);
+  font-size: var(--fs-sm);
+}
+.map-empty svg { width: 22px; height: 22px; }

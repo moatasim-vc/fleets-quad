@@ -161,6 +161,58 @@
     return page;
   }
 
+  /**
+   * Render the editable body sections of a CMS page as prose.
+   * A section with `style: 'quote'` becomes a pull quote; everything else is
+   * a heading plus one paragraph per blank-line-separated run, with markdown
+   * links resolved the same way the blog body does it.
+   * @param {string} slug
+   * @returns {string} html, '' when the page has no editable body
+   */
+  function cmsProse(slug) {
+    return Store.cmsBlocks(slug).map(function (b) {
+      if (!b.text && !b.heading) return '';
+      if (b.style === 'quote') return '<blockquote>' + paragraph(b.text) + '</blockquote>';
+      return (b.heading ? '<h2>' + FS.esc(b.heading) + '</h2>' : '') + paragraphs(b.text);
+    }).join('');
+  }
+
+  /** One <p> per blank-line-separated run. */
+  function paragraphs(text) {
+    return String(text || '').split(/\n{2,}/)
+      .map(function (s) { return s.trim(); })
+      .filter(Boolean)
+      .map(function (s) { return '<p>' + paragraph(s) + '</p>'; })
+      .join('');
+  }
+
+  /**
+   * The Google Maps embed address for a page, or '' when there is none.
+   * The classic `?q=…&output=embed` form needs no API key and no account.
+   * A hand-pasted embed URL is accepted only if it is Google's own.
+   */
+  function mapSrc(page) {
+    var custom = String((page && page.mapEmbed) || '').trim();
+    if (custom) {
+      return /^https:\/\/(www\.)?google\.[a-z.]{2,10}\/maps/.test(custom) ? custom : '';
+    }
+    var addr = String((page && page.mapAddress) || '').trim();
+    if (!addr) return '';
+    return 'https://www.google.com/maps?q=' + encodeURIComponent(addr) + '&output=embed';
+  }
+
+  function mapBlock(page) {
+    var src = mapSrc(page);
+    if (!src) return '';
+    var label = (page && page.mapLabel) || 'Find us';
+    return section(
+      headBlock(label) +
+      '<div class="map-embed">' +
+        '<iframe src="' + FS.esc(src) + '" title="FleetSquad on Google Maps" ' +
+          'loading="lazy" referrerpolicy="no-referrer-when-downgrade" allowfullscreen></iframe>' +
+      '</div>', '', 'padding-top:0');
+  }
+
   function setHero(title, lead, crumbs, extra) {
     document.getElementById('pageTitle').innerHTML = FS.esc(title);
     document.getElementById('pageLead').innerHTML = FS.esc(lead);
@@ -686,13 +738,8 @@
     body.innerHTML =
       section(
         '<div class="split split--2-1" style="gap:var(--sp-8)">' +
-          '<div class="prose">' +
-            '<p>FleetSquad exists because of a simple observation: a vehicle that has to be driven to maintenance is a vehicle that is already costing you money. Every mile to a shop, every hour in a waiting bay and every rental replacement is time your fleet is not earning.</p>' +
-            '<p>We started in 2016 with one ASE Master Technician and one service van. Today we run a nationwide network of mobile technicians, a 24-7 dispatch desk and a platform that keeps every inspection, photograph and invoice attached to the vehicle it belongs to.</p>' +
-            '<h2>What we believe</h2>' +
-            '<p>Maintenance should be scheduled, documented and invisible to the people who depend on the vehicle. Our job is to make the fleet manager\'s week quieter, not busier.</p>' +
-            '<blockquote>The hundred-thousandth work order closed on a box truck in Newark, at 4:40am, in the rain. That is the job.</blockquote>' +
-          '</div>' +
+          // Written in Admin → CMS Pages → About Us.
+          '<div class="prose">' + cmsProse('about') + '</div>' +
           '<div class="card"><div class="card-body">' +
             '<h4 class="mb-4">FleetSquad by the numbers</h4>' +
             D.stats.map(function (s) {
@@ -797,8 +844,12 @@
   }
 
   function contactPage() {
-    applyCmsPage('contact');
+    var page = applyCmsPage('contact');
+    var intro = cmsProse('contact');
     body.innerHTML =
+      (intro
+        ? section('<div class="prose" style="max-width:78ch">' + intro + '</div>', '', 'padding-bottom:0')
+        : '') +
       section(
         '<div class="split split--2-1" style="gap:var(--sp-8)">' +
           '<div class="card"><div class="card-body">' +
@@ -827,13 +878,10 @@
             contactCard('phone-ring', 'Call dispatch', C.phone, 'tel:' + C.phoneRaw, C.hours) +
             contactCard('mail', 'Email support', C.email, 'mailto:' + C.email, 'Replies within one business hour') +
             contactCard('map', 'Service areas', '16 states', FS.url('pages/service-areas.html'), '80+ metro areas covered') +
-            '<div class="card card-pad">' +
-              '<h4 class="mb-3">Emergency roadside</h4>' +
-              '<p class="text-muted text-sm mb-4">Vehicle down right now? Call the 24-7 line — a live dispatcher answers.</p>' +
-              '<a class="btn btn-danger btn-block" href="tel:' + C.phoneRaw + '">' + FS.icon('phone') + 'Call 24-7 dispatch</a>' +
-            '</div>' +
           '</div>' +
-        '</div>') + ctaBlock();
+        '</div>') +
+      // Address and label both come from the CMS; blank address, no map.
+      mapBlock(page) + ctaBlock();
 
     document.getElementById('contactForm').addEventListener('submit', function (e) {
       e.preventDefault();
@@ -933,35 +981,15 @@
             }).join('') +
           '</div></div>' +
           '<div class="coverage-detail" id="coverageDetail" aria-live="polite"></div>' +
-        '</div>' +
-
-        '<div class="field" style="max-width:420px;margin:0 auto var(--sp-6)">' +
-          '<div class="input-icon">' + FS.icon('search') +
-          '<input class="input" id="areaSearch" placeholder="Filter the list below…" aria-label="Filter service areas"></div>' +
-        '</div>' +
-
-        '<div class="grid grid-4" id="areaGrid">' + covered.map(function (a) {
-          return '<div class="card card-pad area-card" data-state="' +
-              FS.esc((a.state + ' ' + a.code).toLowerCase()) + '" data-cities="' +
-              FS.esc((a.cities.join(' ') + ' ' + (a.counties || []).join(' ')).toLowerCase()) + '">' +
-            '<h4 class="mb-1 row" style="gap:8px">' + FS.icon('map-pin') + FS.esc(a.state) + '</h4>' +
-            '<p class="text-xs text-dim mb-3">' + (a.counties || []).length + ' counties · ' + a.cities.length + ' cities</p>' +
-            '<ul>' + a.cities.map(function (c) {
-              return '<li class="text-muted text-sm" style="padding:4px 0">' + FS.esc(c) + '</li>';
-            }).join('') + '</ul>' +
-            ((a.counties || []).length
-              ? '<p class="text-xs text-dim mt-3"><strong>Counties:</strong> ' + FS.esc(a.counties.join(', ')) + '</p>'
-              : '') +
-          '</div>';
-        }).join('') + '</div>' +
-
-        '<p class="text-center text-muted mt-8">Do not see your city? We add markets every month — ' +
-        '<a href="' + FS.url('pages/contact.html') + '">tell us where you are</a>.</p>'
+        '</div>'
+        /* The page ends on the map. The filter box, the per-state card grid
+           and the "do not see your city" line below it were removed at the
+           client's request — the map already lists every city and county for
+           whichever state you hover, so the grid repeated it. */
       ) + ctaBlock();
 
     wireCheck();
     wireMap();
-    wireFilter();
 
     function kpi(value, label) {
       return '<div class="kpi text-center"><div class="kpi-value" style="font-size:2.2rem">' + value + '</div>' +
@@ -979,7 +1007,6 @@
         var query = input.value.trim();
         if (!query) return;
 
-        FS.$$('.area-card').forEach(function (c) { c.classList.remove('is-hit'); });
         var hit = Store.lookupArea(query);
 
         if (!hit) {
@@ -997,14 +1024,7 @@
           FS.esc(hit.area.state) + ' is fully covered across ' + (hit.area.counties || []).length +
           ' counties.</div></div>';
 
-        var card = FS.$$('.area-card').filter(function (c) {
-          return c.dataset.state.indexOf(hit.area.state.toLowerCase()) > -1;
-        })[0];
-        if (card) {
-          card.classList.remove('hidden');
-          card.classList.add('is-hit');
-          card.scrollIntoView({ block: 'center', behavior: 'smooth' });
-        }
+        // Open that state on the map, which is now where the detail lives.
         var stateButton = document.querySelector('[data-map-state="' + hit.area.code + '"]');
         if (stateButton) stateButton.click();
       });
@@ -1042,41 +1062,20 @@
       show(covered[0] ? covered[0].code : 'AL');
     }
 
-    function wireFilter() {
-      var search = document.getElementById('areaSearch');
-      search.addEventListener('input', function () {
-        var q = search.value.trim().toLowerCase();
-        FS.$$('#areaGrid [data-state]').forEach(function (card) {
-          var hit = !q || card.dataset.state.indexOf(q) > -1 || card.dataset.cities.indexOf(q) > -1;
-          card.classList.toggle('hidden', !hit);
-        });
-      });
-    }
   }
 
+  /* Privacy and Terms share a template; both bodies are written in the CMS. */
   function legalPage() {
-    var isPrivacy = /privacy/.test(window.location.pathname);
-    applyCmsPage(isPrivacy ? 'privacy' : 'terms');
-    var blocks = isPrivacy
-      ? [['Information we collect', 'We collect the contact and fleet details you provide when you request an estimate or create an account: name, company, phone number, email address, service address and the vehicle information needed to perform the work.'],
-         ['How we use it', 'To schedule and perform your service, to send you project updates by SMS and email, to invoice you, and to maintain the maintenance and compliance record attached to each vehicle.'],
-         ['Sharing', 'We share your information with the technician assigned to your project and with our payment processor. We do not sell customer data.'],
-         ['Retention', 'Maintenance and inspection records are retained for the period required by federal and state regulation. You may request deletion of everything not subject to a retention requirement.'],
-         ['Your choices', 'You can opt out of marketing messages at any time. Transactional messages about an active project cannot be disabled while the project is open.'],
-         ['Contact', 'Questions about this policy can be sent to ' + C.email + '.']]
-      : [['Services', 'FleetSquad provides mobile fleet maintenance, repair, diagnostic and inspection services at the location you specify. Scope and pricing are confirmed in a written estimate that you approve before work begins.'],
-         ['Estimates and authorisation', 'No work is performed without your authorisation. A final invoice may not exceed an approved estimate without your written agreement to the additional scope.'],
-         ['Access and safety', 'You are responsible for providing safe and lawful access to the vehicles, including keys, gate codes and a work area that meets applicable safety requirements.'],
-         ['Warranty', 'Parts and labour carry a 12-month / 12,000-mile warranty. Warranty service is performed at the vehicle. The warranty does not cover damage from misuse, accident or unauthorised repair.'],
-         ['Payment', 'Invoices are due on the terms stated on the invoice. Accounts on a monthly agreement receive one consolidated invoice per period.'],
-         ['Limitation of liability', 'Our liability for any claim is limited to the amount paid for the service giving rise to the claim.']];
+    var slug = /privacy/.test(window.location.pathname) ? 'privacy' : 'terms';
+    var page = applyCmsPage(slug);
 
     body.innerHTML = section(
       '<div class="prose" style="max-width:78ch;margin-inline:auto">' +
-        '<p class="text-dim text-sm">Last updated ' + FS.date(new Date(Date.now() - 120 * 864e5).toISOString(), 'long') + '</p>' +
-        blocks.map(function (b) {
-          return '<h2>' + FS.esc(b[0]) + '</h2><p>' + FS.esc(b[1]) + '</p>';
-        }).join('') +
+        (page && page.showUpdated !== false
+          ? '<p class="text-dim text-sm">Last updated ' + FS.date(page && page.updated, 'long') + '</p>'
+          : '') +
+        (cmsProse(slug) ||
+          '<p class="text-dim">This page has not been written yet.</p>') +
       '</div>');
   }
 

@@ -394,9 +394,23 @@
       var p = Store.cmsPage(slug);
       if (!p) return null;
       Object.assign(p, patch, { updated: new Date().toISOString() });
-      persist();
+      Store.lastWriteOk = persist();
       return p;
     },
+
+    /** The editable body sections of a page, or [] for pages without any. */
+    cmsBlocks: function (slug) {
+      var p = Store.cmsPage(slug);
+      return (p && p.blocks) || [];
+    },
+
+    /** Whether a page's body is editable in the CMS at all. */
+    hasBlocks: function (slug) {
+      var p = Store.cmsPage(slug);
+      return !!(p && Array.isArray(p.blocks));
+    },
+
+    newBlock: function () { return { heading: '', style: 'text', text: '' }; },
 
     faqs: function () { return state.faqs; },
 

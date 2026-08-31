@@ -449,6 +449,7 @@
   function newSale() {
     var draft = { vehicles: [] };
     var step = 1;
+    var mechQuery = '';   /* step 4 technician search */
     var STEPS = ['Create Customer', 'Vehicle Info', 'Labor &amp; Payment', 'Assign Mechanic', 'Confirmation'];
 
     render();
@@ -647,6 +648,51 @@
     }
 
     /* --- 4. Assign mechanic --------------------------------------------- */
+    /**
+     * Technicians matching the step 4 search box. Name is matched on any word
+     * so "mendez" finds Carlos Mendez, and the phone comparison drops
+     * punctuation so "2125550301" and "212 555" both match "(212) 555-0301".
+     * @returns {Array} the mechanics to show, unfiltered when nothing is typed
+     */
+    function matchingMechanics() {
+      var q = mechQuery.trim().toLowerCase();
+      if (!q) return Store.mechanics();
+      var digits = q.replace(/\D/g, '');
+      return Store.mechanics().filter(function (m) {
+        if ((m.name + ' ' + m.email + ' ' + m.certs + ' ' + m.city + ' ' + m.state)
+            .toLowerCase().indexOf(q) > -1) return true;
+        return digits.length >= 3 && String(m.phone).replace(/\D/g, '').indexOf(digits) > -1;
+      });
+    }
+
+    function mechList() {
+      var found = matchingMechanics();
+
+      // Say so rather than letting a selection silently disappear.
+      var chosen = draft.mechanicId ? Store.mechanic(draft.mechanicId) : null;
+      var hidden = chosen && !found.some(function (m) { return m.id === chosen.id; })
+        ? '<div class="alert alert--info mb-3">' + FS.icon('info') +
+          '<div><strong>' + FS.esc(chosen.name) + '</strong> is still selected — ' +
+          'the search is hiding them. Clear the box to see them again.</div></div>'
+        : '';
+
+      if (!found.length) {
+        return hidden + '<div class="empty-state empty-state--sm">' + FS.icon('search') +
+          '<h4>No technician matches that</h4>' +
+          '<p>Try part of a name, a phone number or an email address.</p></div>';
+      }
+      return hidden + found.map(function (m) {
+        return '<label class="opt-card' + (draft.mechanicId === m.id ? ' is-selected' : '') + '">' +
+          '<input type="radio" name="mech" value="' + m.id + '"' + (draft.mechanicId === m.id ? ' checked' : '') + '>' +
+          '<span class="avatar avatar--sm">' + FS.initials(m.name) + '</span>' +
+          '<span style="flex:1 1 auto;min-width:0"><strong>' + FS.esc(m.name) + '</strong>' +
+          '<span>' + FS.esc(m.certs) + ' · ' + FS.esc(m.city + ', ' + m.state) + ' · ' + FS.money(m.hourlyRate) + '/h</span>' +
+          '<span class="opt-card-contact">' + FS.esc(m.phone) + ' · ' + FS.esc(m.email) + '</span></span>' +
+          '<span class="badge badge--' + (m.status === 'available' ? 'ok' : m.status === 'on-job' ? 'warn' : 'neutral') + '">' +
+          FS.esc(m.status) + '</span></label>';
+      }).join('');
+    }
+
     function step4() {
       var t = totals();
       return '<h3 class="mb-2">Assign mechanic</h3>' +
@@ -661,15 +707,17 @@
               'The project books anyway and can be marked fully paid from the project screen.') +
           '</div></div>' +
 
-        '<div class="stack">' + Store.mechanics().map(function (m) {
-          return '<label class="opt-card' + (draft.mechanicId === m.id ? ' is-selected' : '') + '">' +
-            '<input type="radio" name="mech" value="' + m.id + '"' + (draft.mechanicId === m.id ? ' checked' : '') + '>' +
-            '<span class="avatar avatar--sm">' + FS.initials(m.name) + '</span>' +
-            '<span style="flex:1 1 auto;min-width:0"><strong>' + FS.esc(m.name) + '</strong>' +
-            '<span>' + FS.esc(m.certs) + ' · ' + FS.esc(m.city + ', ' + m.state) + ' · ' + FS.money(m.hourlyRate) + '/h</span></span>' +
-            '<span class="badge badge--' + (m.status === 'available' ? 'ok' : m.status === 'on-job' ? 'warn' : 'neutral') + '">' +
-            FS.esc(m.status) + '</span></label>';
-        }).join('') + '</div>' +
+        /* Search sits above the list so a long roster can be narrowed by
+           first name, last name, phone or email before picking. */
+        '<div class="list-search mb-4">' +
+          '<span class="list-search-ico">' + FS.icon('search') + '</span>' +
+          '<input class="input" id="nsMechSearch" type="search" autocomplete="off" ' +
+            'placeholder="Search technicians by name, phone or email" ' +
+            'aria-label="Search available mechanics" value="' + FS.esc(mechQuery) + '">' +
+          '<span class="list-search-count" id="nsMechCount"></span>' +
+        '</div>' +
+
+        '<div class="stack" id="nsMechList">' + mechList() + '</div>' +
         '<label class="opt-card mt-3">' +
           '<input type="radio" name="mech" value=""' + (draft.mechanicId === '' ? ' checked' : '') + '>' +
           '<span class="avatar avatar--sm">' + FS.icon('clock') + '</span>' +
@@ -766,14 +814,45 @@
       });
 
       if (step === 3) wireLaborStep();
+      if (step === 4) wireMechStep();
 
       var restart = document.getElementById('nsRestart');
       if (restart) restart.addEventListener('click', function () {
-        draft = { vehicles: [] }; step = 1; render();
+        draft = { vehicles: [] }; mechQuery = ''; step = 1; render();
       });
 
       var next = document.getElementById('nsNext');
       if (next) next.addEventListener('click', onNext);
+    }
+
+    /* Typing filters the roster in place. Only the list is repainted, so the
+       search box keeps focus and the caret, and a technician picked before
+       searching stays picked even while filtered out of view. */
+    function wireMechStep() {
+      var box = document.getElementById('nsMechSearch');
+      var list = document.getElementById('nsMechList');
+      var count = document.getElementById('nsMechCount');
+      if (!box) return;
+
+      // host survives every repaint, so this is bound once for the wizard.
+      if (!host.dataset.mechBound) {
+        host.dataset.mechBound = '1';
+        host.addEventListener('change', function (e) {
+          if (e.target.name === 'mech') draft.mechanicId = e.target.value;
+        });
+      }
+
+      function paint() {
+        var total = Store.mechanics().length;
+        var found = matchingMechanics().length;
+        count.textContent = mechQuery.trim() ? found + ' of ' + total : total + ' technicians';
+        list.innerHTML = mechList();
+        FS.hydrateIcons(list);
+      }
+
+      box.addEventListener('input', function () { mechQuery = box.value; paint(); });
+      box.addEventListener('search', function () { mechQuery = box.value; paint(); });
+      paint();
     }
 
     /* Rate x hours recalculates as you type, and the Charge button follows. */
@@ -890,12 +969,14 @@
           return;
         }
       } else if (step === 4) {
+        // A technician chosen before the search was narrowed may no longer be
+        // in the DOM, so the recorded choice is the fallback.
         var picked = host.querySelector('input[name="mech"]:checked');
-        if (!picked) {
+        if (!picked && draft.mechanicId === undefined) {
           FS.toast('Choose an option', 'Pick a technician, or leave the project unassigned.', 'warn');
           return;
         }
-        draft.mechanicId = picked.value;
+        draft.mechanicId = picked ? picked.value : draft.mechanicId;
         finish();
         step = 5;
         render();
@@ -1344,12 +1425,17 @@
   function cms() {
     render();
 
+    /** "1 section" / "6 sections" — the count under a page name. */
+    function plural(n, word) { return n + ' ' + word + (n === 1 ? '' : 's'); }
+    function note(text) { return '<br><small class="text-xs text-dim">' + text + '</small>'; }
+
     function render() {
       var pages = Store.cmsPages();
 
       host.innerHTML =
         '<div class="page-head"><div><h2>CMS Pages</h2>' +
-          '<p>The heading, standfirst and search-engine record for every inner page reachable from the nav bar. ' +
+          '<p>The heading, standfirst and search-engine record for every inner page reachable from the nav bar — ' +
+            'and the body copy on About, Contact, Privacy and Terms. ' +
             'Edits show on the live page straight away.</p></div>' +
           '<div class="page-head-actions">' +
             '<a class="btn btn-outline" href="' + FS.url('admin/blog.html') + '">' + FS.icon('edit') + 'Blog</a>' +
@@ -1369,11 +1455,12 @@
                 // Partners is the one page whose cards are edited here too —
                 // say so, otherwise nobody would think to open it.
                 (p.slug === 'partners'
-                  ? '<br><small class="text-xs text-dim">' + Store.partners().length +
-                    ' partner cards</small>'
+                  ? note(plural(Store.partners().length, 'partner card'))
                   : p.slug === 'faqs'
-                    ? '<br><small class="text-xs text-dim">' + Store.faqs().length +
-                      ' questions</small>'
+                    ? note(plural(Store.faqs().length, 'question'))
+                  : Store.hasBlocks(p.slug)
+                    ? note(plural(Store.cmsBlocks(p.slug).length, 'section') +
+                        (p.mapAddress || p.mapEmbed ? ' · map' : ''))
                   : '') + '</td>' +
               '<td data-label="Address"><code class="text-sm text-dim">/' + FS.esc(p.slug) + '</code></td>' +
               '<td data-label="Meta title"><span class="text-sm">' + FS.esc(p.metaTitle || '—') + '</span><br>' +
@@ -1414,11 +1501,18 @@
          held in a working copy and only committed on Save. */
       var isPartners = p.slug === 'partners';
       var isFaqs = p.slug === 'faqs';
+      var isContact = p.slug === 'contact';
+      /* About, Contact, Privacy and Terms carry their body copy as a list of
+         sections rather than markup, so the whole page is editable here. */
+      var hasBlocks = Store.hasBlocks(p.slug);
       var rows = isPartners
         ? Store.partners().map(function (x) { return Object.assign({}, x); })
         : [];
       var faqRows = isFaqs
         ? Store.faqs().map(function (x) { return Object.assign({}, x); })
+        : [];
+      var blocks = hasBlocks
+        ? Store.cmsBlocks(p.slug).map(function (x) { return Object.assign({}, x); })
         : [];
 
       FS.modal({
@@ -1432,6 +1526,42 @@
             '<input class="input" id="cmHeading" name="heading" value="' + FS.esc(p.heading || '') + '"></div>' +
           '<div class="field"><label class="label" for="cmLead">Standfirst under the heading</label>' +
             '<textarea class="textarea" id="cmLead" name="lead" style="min-height:70px">' + FS.esc(p.lead || '') + '</textarea></div>' +
+
+          (hasBlocks
+            ? '<div class="divider"></div>' +
+              '<div class="row-between mb-3">' +
+                '<h4 class="mb-0">Page content</h4>' +
+                '<button type="button" class="btn btn-sm btn-outline" id="cmAddBlock">' +
+                  FS.icon('plus') + 'Add section</button>' +
+              '</div>' +
+              '<p class="text-muted text-sm mb-4">Each section is a heading and its text on the live page. ' +
+                'Leave a blank line to start a new paragraph, and link with markdown: ' +
+                '<code>[text](https://…)</code>.</p>' +
+              '<div class="repeater" id="cmBlocks"></div>'
+            : '') +
+
+          (isContact
+            ? '<div class="divider"></div>' +
+              '<h4 class="mb-3">Google map</h4>' +
+              '<p class="text-muted text-sm mb-4">Type the address the map should centre on. ' +
+                'It uses Google\'s public embed — no API key and no account needed. ' +
+                'Clear the address to take the map off the page.</p>' +
+              '<div class="field"><label class="label" for="cmMapAddress">Address or place</label>' +
+                '<input class="input" id="cmMapAddress" name="mapAddress" ' +
+                'value="' + FS.esc(p.mapAddress || '') + '" ' +
+                'placeholder="1200 Fleet Way, Newark, NJ 07102"></div>' +
+              '<div class="field"><label class="label" for="cmMapLabel">Heading above the map</label>' +
+                '<input class="input" id="cmMapLabel" name="mapLabel" ' +
+                'value="' + FS.esc(p.mapLabel || '') + '" placeholder="Where we are"></div>' +
+              '<div class="field"><label class="label" for="cmMapEmbed">Advanced: paste an embed link</label>' +
+                '<input class="input" id="cmMapEmbed" name="mapEmbed" ' +
+                'value="' + FS.esc(p.mapEmbed || '') + '" ' +
+                'placeholder="https://www.google.com/maps/embed?pb=…">' +
+                '<p class="hint">From Google Maps → Share → Embed a map. Overrides the address above. ' +
+                  'Only google.com links are accepted.</p></div>' +
+              '<div class="map-embed map-embed--preview mb-2" id="cmMapPreview"></div>'
+            : '') +
+
           '<div class="divider"></div>' +
           '<h4 class="mb-4">Search engine listing</h4>' +
           '<div class="field"><label class="label" for="cmMetaTitle">Meta title</label>' +
@@ -1506,6 +1636,47 @@
             });
           }
 
+          if (hasBlocks) {
+            paintBlocks(root);
+            root.querySelector('#cmAddBlock').addEventListener('click', function () {
+              collectBlocks(root);
+              blocks.push(Store.newBlock());
+              paintBlocks(root);
+              var last = root.querySelector('#cmBlocks .repeat-item:last-child [data-bheading]');
+              if (last) last.focus();
+            });
+          }
+
+          if (isContact) {
+            var addr = root.querySelector('#cmMapAddress');
+            var embed = root.querySelector('#cmMapEmbed');
+            var preview = root.querySelector('#cmMapPreview');
+
+            /* Same rule the live page applies, so the preview cannot show
+               something the page would then refuse to render. */
+            function src() {
+              var custom = embed.value.trim();
+              if (custom) {
+                return /^https:\/\/(www\.)?google\.[a-z.]{2,10}\/maps/.test(custom) ? custom : '';
+              }
+              return addr.value.trim()
+                ? 'https://www.google.com/maps?q=' + encodeURIComponent(addr.value.trim()) + '&output=embed'
+                : '';
+            }
+            function paintMap() {
+              var url = src();
+              preview.innerHTML = url
+                ? '<iframe src="' + FS.esc(url) + '" title="Map preview" loading="lazy" ' +
+                  'referrerpolicy="no-referrer-when-downgrade"></iframe>'
+                : '<span class="map-empty">' + FS.icon('map-pin') +
+                  (embed.value.trim() ? 'That is not a Google Maps link' : 'No map on the page') + '</span>';
+              FS.hydrateIcons(preview);
+            }
+            addr.addEventListener('input', paintMap);
+            embed.addEventListener('input', paintMap);
+            paintMap();
+          }
+
           root.querySelector('#cmSave').addEventListener('click', function () {
             if (isPartners) {
               collectPartners(root);
@@ -1525,9 +1696,22 @@
                 return;
               }
             }
-            Store.saveCmsPage(p.slug, FS.formData(root.querySelector('#cmsForm')));
+            var patch = FS.formData(root.querySelector('#cmsForm'));
+            if (hasBlocks) {
+              collectBlocks(root);
+              // An empty section is one the admin started and abandoned.
+              patch.blocks = blocks.filter(function (b) { return b.heading || b.text; });
+            }
+            Store.saveCmsPage(p.slug, patch);
+            if (!Store.lastWriteOk) {
+              FS.toast('Saved, but not kept', 'This browser refused the write. The change is ' +
+                'live until you reload.', 'warn');
+            }
             close();
-            FS.toast('Page saved', isPartners ? p.title + ' · ' + rows.length + ' partners' : p.title, 'ok');
+            FS.toast('Page saved',
+              isPartners ? p.title + ' · ' + rows.length + ' partners'
+                : hasBlocks ? p.title + ' · ' + (patch.blocks || []).length + ' sections'
+                : p.title, 'ok');
             render();
           });
         }
@@ -1634,6 +1818,89 @@
           '</div>' +
           '<button type="button" class="btn btn-xs btn-danger repeat-remove" data-premove ' +
             'aria-label="Remove partner">' + FS.icon('trash') + '</button>' +
+        '</div>';
+      }
+
+      /* --- Page body repeater ----------------------------------------
+         The About, Contact, Privacy and Terms bodies. Each row is one
+         section on the live page. ------------------------------------- */
+
+      function collectBlocks(root) {
+        FS.$$('#cmBlocks .repeat-item', root).forEach(function (el) {
+          var row = blocks[Number(el.dataset.i)];
+          if (!row) return;
+          row.heading = el.querySelector('[data-bheading]').value.trim();
+          row.style = el.querySelector('[data-bstyle]').value;
+          row.text = el.querySelector('[data-btext]').value.trim();
+        });
+      }
+
+      function paintBlocks(root) {
+        var list = root.querySelector('#cmBlocks');
+        list.innerHTML = blocks.length
+          ? blocks.map(blockRow).join('')
+          : '<p class="text-dim text-sm">No sections yet. Add the first one above.</p>';
+        FS.hydrateIcons(list);
+
+        FS.$$('[data-bremove]', list).forEach(function (b) {
+          b.addEventListener('click', function () {
+            collectBlocks(root);
+            blocks.splice(Number(b.closest('.repeat-item').dataset.i), 1);
+            paintBlocks(root);
+          });
+        });
+
+        /* Reordering, because a policy is read in order. */
+        FS.$$('[data-bmove]', list).forEach(function (b) {
+          b.addEventListener('click', function () {
+            collectBlocks(root);
+            var i = Number(b.closest('.repeat-item').dataset.i);
+            var to = i + Number(b.dataset.bmove);
+            if (to < 0 || to >= blocks.length) return;
+            var moved = blocks.splice(i, 1)[0];
+            blocks.splice(to, 0, moved);
+            paintBlocks(root);
+          });
+        });
+
+        // A pull quote has no heading of its own, so hide the field for one.
+        FS.$$('[data-bstyle]', list).forEach(function (sel) {
+          sel.addEventListener('change', function () {
+            sel.closest('.repeat-item')
+              .classList.toggle('is-quote', sel.value === 'quote');
+          });
+        });
+      }
+
+      function blockRow(b, i) {
+        var quote = b.style === 'quote';
+        return '<div class="repeat-item repeat-item--block' + (quote ? ' is-quote' : '') +
+            '" data-i="' + i + '">' +
+          '<div class="repeat-fields">' +
+            '<div class="field-row field-row-2">' +
+              '<div class="field block-heading-field"><span class="label">Section heading</span>' +
+                '<input class="input" data-bheading aria-label="Section heading" ' +
+                'value="' + FS.esc(b.heading || '') + '" placeholder="Leave blank for no heading"></div>' +
+              '<div class="field"><span class="label">Style</span>' +
+                '<select class="select" data-bstyle aria-label="Section style">' +
+                  '<option value="text"' + (quote ? '' : ' selected') + '>Paragraphs</option>' +
+                  '<option value="quote"' + (quote ? ' selected' : '') + '>Pull quote</option>' +
+                '</select></div>' +
+            '</div>' +
+            '<div class="field mb-0"><span class="label">Text</span>' +
+              '<textarea class="textarea" data-btext aria-label="Section text" style="min-height:104px" ' +
+                'placeholder="Blank line between paragraphs.">' + FS.esc(b.text || '') + '</textarea></div>' +
+          '</div>' +
+          '<div class="repeat-actions">' +
+            '<button type="button" class="btn btn-xs btn-outline" data-bmove="-1" ' +
+              'aria-label="Move section up"' + (i === 0 ? ' disabled' : '') + '>' +
+              FS.icon('chevron-up') + '</button>' +
+            '<button type="button" class="btn btn-xs btn-outline" data-bmove="1" ' +
+              'aria-label="Move section down"' + (i === blocks.length - 1 ? ' disabled' : '') + '>' +
+              FS.icon('chevron-down') + '</button>' +
+            '<button type="button" class="btn btn-xs btn-danger" data-bremove ' +
+              'aria-label="Remove section">' + FS.icon('trash') + '</button>' +
+          '</div>' +
         '</div>';
       }
 
