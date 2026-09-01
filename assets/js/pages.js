@@ -88,6 +88,48 @@
    */
   var seoApplied = false;
 
+  /**
+   * The client's meta sheet entry for a page, if it has one.
+   * @param {string} key      e.g. 'service:mobile-fleet-repair'
+   * @param {object} [fallback] used when the sheet does not list the page
+   * @param {object} [extra]  merged in either way (og:image, type…)
+   * @returns {object} a setSeo() payload
+   */
+  function sheet(key, fallback, extra) {
+    var entry = D.seoFor(key);
+    return Object.assign({}, entry || fallback || {}, extra || {});
+  }
+
+  /**
+   * The SEO record for a catalog item (service / industry / vehicle type).
+   * These are editable in the admin, so the record's own `seo` block wins;
+   * any field left blank there falls back to the generated one, which keeps a
+   * newly-added service from shipping an empty title.
+   * @param {object} item   the catalog record
+   * @param {object} fallback generated title/description/keywords/path
+   * @param {object} [extra]  merged in either way (og:image…)
+   */
+  function itemSeo(item, fallback, extra) {
+    var own = item.seo || {};
+    return Object.assign({}, fallback, {
+      title: own.title || fallback.title,
+      description: own.description || fallback.description,
+      keywords: own.keywords || fallback.keywords,
+      path: own.path || fallback.path
+    }, extra || {});
+  }
+
+  /**
+   * Which record this page is for.
+   * A page reached as service.html?s=slug carries it in the query string; the
+   * same page served from its own folder (/mobile-fleet-repair/index.html)
+   * carries it as <body data-slug="…"> instead. Either works.
+   * @param {string} key the query-string parameter to look for
+   */
+  function slugOf(key) {
+    return FS.param(key) || document.body.dataset.slug || '';
+  }
+
   function setSeo(seo) {
     if (seo.title) { document.title = seo.title; seoApplied = true; }
     meta('name', 'description', seo.description);
@@ -152,11 +194,13 @@
     if (h1 && page.heading) h1.textContent = page.heading;
     if (lead && page.lead) lead.textContent = page.lead;
 
+    // metaTitle / metaDescription / keywords are seeded from the meta sheet
+    // and are editable in Admin -> CMS Pages, so whatever is saved wins here.
     setSeo({
       title: page.metaTitle || (page.title + ' | FleetSquad'),
       description: page.metaDescription || page.lead || '',
       keywords: page.keywords,
-      path: slug === 'service-areas' ? 'service-areas' : slug
+      path: page.path || slug
     });
     return page;
   }
@@ -256,7 +300,7 @@
       path: 'services'
     });
     body.innerHTML =
-      section('<div class="grid grid-3">' + D.services.map(function (s) {
+      section('<div class="grid grid-3">' + Store.catalog('service').map(function (s) {
         return '<a class="svc-card" href="' + FS.url('service.html?s=' + s.slug) + '">' +
           '<div class="svc-media">' +
             '<img src="' + FS.url(s.image) + '" alt="' + FS.esc(s.name) + '" loading="lazy">' +
@@ -274,16 +318,15 @@
   }
 
   function serviceDetail() {
-    var s = D.services.filter(function (x) { return x.slug === FS.param('s'); })[0];
+    var s = Store.catalogItem('service', slugOf('s'));
     if (!s) return notFound('service', 'services.html', 'All services');
 
-    setSeo({
+    setSeo(itemSeo(s, {
       title: s.name + ' | Mobile Fleet Service | FleetSquad',
       description: s.excerpt,
       keywords: [s.short.toLowerCase(), 'mobile ' + s.short.toLowerCase(), 'fleet maintenance', 'ase master techs'].join(', '),
-      path: 'services/' + s.slug,
-      image: s.image
-    });
+      path: 'services/' + s.slug
+    }, { image: s.image }));
 
     setHero(s.hero, s.intro.split('. ')[0] + '.',
       [{ label: 'Home', href: 'index.html' }, { label: 'Services', href: 'services.html' }, { label: s.short }],
@@ -313,7 +356,7 @@
 
       section(headBlock('Vehicles we service', 'Class 1 through Class 8 — all makes and models.') +
         '<div class="vehicles-grid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:var(--sp-5)">' +
-        D.vehicleTypes.map(function (v) {
+        Store.catalog('vehicle').map(function (v) {
           return '<a class="veh-item" href="' + FS.url('vehicle.html?v=' + v.slug) + '" style="flex-direction:column;text-align:center;border:0">' +
             '<img src="' + FS.url(v.image) + '" alt="' + FS.esc(v.name) + '" loading="lazy">' +
             '<span>' + FS.esc(v.name) + '</span></a>';
@@ -334,7 +377,7 @@
       path: 'industries'
     });
     body.innerHTML =
-      section('<div class="grid grid-3">' + D.industries.map(function (i) {
+      section('<div class="grid grid-3">' + Store.catalog('industry').map(function (i) {
         return '<a class="tile" href="' + FS.url('industry.html?i=' + i.slug) + '">' +
           '<span class="kpi-icon kpi-icon--navy mb-3">' + FS.icon(i.icon) + '</span>' +
           '<h3>' + FS.esc(i.name) + '</h3><p>' + FS.esc(i.excerpt) + '</p>' +
@@ -343,15 +386,15 @@
   }
 
   function industryDetail() {
-    var i = D.industries.filter(function (x) { return x.slug === FS.param('i'); })[0];
+    var i = Store.catalogItem('industry', slugOf('i'));
     if (!i) return notFound('industry', 'industries.html', 'All industries');
 
-    setSeo({
+    setSeo(itemSeo(i, {
       title: i.name + ' Maintenance & Repair | FleetSquad',
       description: i.excerpt,
       keywords: [i.name.toLowerCase(), i.name.toLowerCase() + ' maintenance', 'mobile fleet service'].join(', '),
       path: 'industries/' + i.slug
-    });
+    }));
 
     setHero(i.hero, i.intro,
       [{ label: 'Home', href: 'index.html' }, { label: 'Industries', href: 'industries.html' }, { label: i.name }],
@@ -369,7 +412,7 @@
           '<p class="prose mb-6">' + FS.esc(i.intro) + '</p>' + bulletList(i.bullets) + '</div>' +
           '<div class="card"><div class="card-body">' +
             '<h4 class="mb-4">Popular services</h4>' +
-            D.services.slice(0, 5).map(function (s) {
+            Store.catalog('service').slice(0, 5).map(function (s) {
               return '<a class="row-between" href="' + FS.url('service.html?s=' + s.slug) + '" ' +
                 'style="padding:11px 0;border-bottom:1px solid var(--line-soft);color:var(--ink-700)">' +
                 '<span class="text-semi">' + FS.esc(s.short) + '</span>' + FS.icon('chevron-right') + '</a>';
@@ -397,7 +440,7 @@
       path: 'vehicles'
     });
     body.innerHTML =
-      section('<div class="grid grid-3">' + D.vehicleTypes.map(function (v) {
+      section('<div class="grid grid-3">' + Store.catalog('vehicle').map(function (v) {
         return '<a class="tile text-center" href="' + FS.url('vehicle.html?v=' + v.slug) + '">' +
           '<img src="' + FS.url(v.image) + '" alt="' + FS.esc(v.name) + '" style="margin:0 auto var(--sp-4);max-width:260px" loading="lazy">' +
           '<h3>' + FS.esc(v.name) + '</h3><p>' + FS.esc(v.excerpt) + '</p>' +
@@ -406,16 +449,15 @@
   }
 
   function vehicleDetail() {
-    var v = D.vehicleTypes.filter(function (x) { return x.slug === FS.param('v'); })[0];
+    var v = Store.catalogItem('vehicle', slugOf('v'));
     if (!v) return notFound('vehicle type', 'vehicles.html', 'All vehicle types');
 
-    setSeo({
+    setSeo(itemSeo(v, {
       title: v.hero + ' | Mobile Service | FleetSquad',
       description: v.excerpt + ' ' + v.intro.split('. ')[0] + '.',
       keywords: [v.name.toLowerCase(), v.name.toLowerCase() + ' repair', v.name.toLowerCase() + ' maintenance', 'mobile mechanic'].join(', '),
-      path: 'vehicles/' + v.slug,
-      image: v.image
-    });
+      path: 'vehicles/' + v.slug
+    }, { image: v.image }));
 
     setHero(v.hero, v.intro,
       [{ label: 'Home', href: 'index.html' }, { label: 'Vehicles', href: 'vehicles.html' }, { label: v.name }],
@@ -430,7 +472,7 @@
         '</div>') +
 
       section(headBlock('Services for ' + v.name.toLowerCase()) +
-        '<div class="grid grid-3">' + D.services.slice(0, 6).map(function (s) {
+        '<div class="grid grid-3">' + Store.catalog('service').slice(0, 6).map(function (s) {
           return '<a class="tile" href="' + FS.url('service.html?s=' + s.slug) + '">' +
             '<span class="kpi-icon mb-3">' + FS.icon(s.icon) + '</span>' +
             '<h3>' + FS.esc(s.short) + '</h3><p>' + FS.esc(s.excerpt) + '</p>' +
@@ -464,12 +506,7 @@
     var posts = Store.posts('published');
     var shown = active === 'All' ? posts : posts.filter(function (p) { return p.category === active; });
 
-    setSeo({
-      title: 'Fleet Maintenance Blog | Uptime & Compliance | FleetSquad',
-      description: 'Practical guidance on fleet uptime, DOT compliance, preventive maintenance and cost control, written by the technicians who do the work.',
-      keywords: 'fleet maintenance blog, fleet uptime, dot compliance, preventive maintenance',
-      path: 'blog'
-    });
+    setSeo(sheet('blog'));
 
     /* No category row above the grid — the client asked for the articles on
        their own. A ?cat= link still filters, so a category can be linked to
@@ -490,7 +527,7 @@
   }
 
   function blogPost() {
-    var p = Store.post(FS.param('p'));
+    var p = Store.post(slugOf('p'));
     if (!p) return notFound('article', 'blog.html', 'All posts');
 
     setSeo({
@@ -932,11 +969,13 @@
     var cities = covered.reduce(function (s, a) { return s + a.cities.length; }, 0);
     var counties = covered.reduce(function (s, a) { return s + (a.counties || []).length; }, 0);
 
+    // applyCmsPage above already wrote the record; this repeats it because the
+    // counts below are computed first. Same source, so the same values.
     setSeo({
       title: page.metaTitle || 'Service Areas & Coverage Map | FleetSquad',
       description: page.metaDescription || 'See every state, county and metro FleetSquad covers.',
       keywords: page.keywords,
-      path: 'service-areas'
+      path: page.path || 'service-areas/'
     });
 
     body.innerHTML =

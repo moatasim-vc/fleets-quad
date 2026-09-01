@@ -40,6 +40,9 @@
       serviceAreas:  clone(FS.data.serviceAreas),
       cmsPages:      clone(FS.data.cmsPages),
       partners:      clone(FS.data.partners),
+      services:      clone(FS.data.services),
+      industries:    clone(FS.data.industries),
+      vehicleTypes:  clone(FS.data.vehicleTypes),
       faqs:          clone(FS.data.faqs),
       credentials:   credentials,
       settings:      { stripe: {}, stripeMode: 'test', stripeConnected: false },
@@ -47,8 +50,40 @@
       session:       null,
       impersonator:  null,
       nextProject:   1233,
-      nextCustomer:  1009
+      nextCustomer:  1009,
+      seedVersion:   SEED_VERSION
     };
+  }
+
+  /* Bumped when the shipped data changes in a way a saved state must pick up.
+     Anything not listed in migrate() below is left exactly as the user left
+     it — this is deliberately narrow, not a reset. */
+  var SEED_VERSION = 2;
+
+  /**
+   * Fold new shipped data into a state that was saved by an earlier build.
+   * @param {object} saved what is in localStorage
+   * @param {object} fresh what this build ships
+   * @param {number|undefined} was the version the state was saved at. Passed in
+   *   rather than read off `saved`, because the fill-in-missing-keys pass runs
+   *   first and would already have copied the current version onto it.
+   */
+  function migrate(saved, fresh, was) {
+    if (was === SEED_VERSION) return;
+
+    // v2: the client supplied their SEO sheet. Take the meta record for every
+    // CMS page from it, but leave headings, body copy and status alone — those
+    // are the admin's, the meta is the sheet's.
+    fresh.cmsPages.forEach(function (f) {
+      var mine = saved.cmsPages.filter(function (p) { return p.slug === f.slug; })[0];
+      if (!mine) { saved.cmsPages.push(f); return; }
+      mine.metaTitle = f.metaTitle;
+      mine.metaDescription = f.metaDescription;
+      mine.keywords = f.keywords;
+      mine.path = f.path;
+    });
+
+    saved.seedVersion = SEED_VERSION;
   }
 
   var state;
@@ -62,9 +97,11 @@
       state = seed();
     } else {
       var fresh = seed();
+      var savedVersion = state.seedVersion;
       Object.keys(fresh).forEach(function (k) {
         if (state[k] === undefined) state[k] = fresh[k];
       });
+      migrate(state, fresh, savedVersion);
     }
   } catch (e) {
     state = seed();
@@ -451,6 +488,119 @@
         };
       });
       return persist();
+    },
+
+    /* ----------------------------------------------------------------------
+       Catalog — services, industries and vehicle types
+       All three drive a public template page, the nav and the footer, and all
+       three are edited the same way, so one set of methods covers them. The
+       `kind` is 'service' | 'industry' | 'vehicle'.
+       ---------------------------------------------------------------------- */
+
+    /** The state key and the public page each kind lives on. */
+    catalogMeta: {
+      service:  { key: 'services',     page: 'service.html',  param: 's', label: 'Service' },
+      industry: { key: 'industries',   page: 'industry.html', param: 'i', label: 'Industry' },
+      vehicle:  { key: 'vehicleTypes', page: 'vehicle.html',  param: 'v', label: 'Vehicle type' }
+    },
+
+    catalog: function (kind) {
+      var meta = Store.catalogMeta[kind];
+      return meta ? state[meta.key] : [];
+    },
+
+    catalogItem: function (kind, slug) {
+      return Store.catalog(kind).filter(function (x) { return x.slug === slug; })[0] || null;
+    },
+
+    /**
+     * Write a patch onto one record. A slug change is applied here too, so
+     * every caller goes through one place that can keep it URL-safe.
+     * @returns {object|null} the updated record
+     */
+    saveCatalogItem: function (kind, slug, patch) {
+      var item = Store.catalogItem(kind, slug);
+      if (!item) return null;
+      if (patch.slug) patch.slug = Store.slugify(patch.slug) || item.slug;
+      Object.assign(item, patch);
+      Store.lastWriteOk = persist();
+      return item;
+    },
+
+    /** Append a blank record and return it, ready to edit. */
+    createCatalogItem: function (kind) {
+      var meta = Store.catalogMeta[kind];
+      if (!meta) return null;
+      var n = state[meta.key].length + 1;
+      var slug = Store.uniqueSlug(kind, 'new-' + kind + '-' + n);
+      var item = {
+        slug: slug,
+        name: 'New ' + meta.label.toLowerCase(),
+        short: '',
+        icon: 'truck-wrench',
+        image: kind === 'industry' ? '' : 'assets/img/services/preventive-maintenance.jpg',
+        excerpt: '',
+        hero: '',
+        intro: '',
+        features: [],
+        stats: [],
+        bullets: [],
+        seo: { title: '', description: '', keywords: '', path: slug + '/' }
+      };
+      state[meta.key].push(item);
+      Store.lastWriteOk = persist();
+      return item;
+    },
+
+    deleteCatalogItem: function (kind, slug) {
+      var meta = Store.catalogMeta[kind];
+      if (!meta) return false;
+      var before = state[meta.key].length;
+      state[meta.key] = state[meta.key].filter(function (x) { return x.slug !== slug; });
+      persist();
+      return state[meta.key].length < before;
+    },
+
+    /** Move a record up or down; the order drives the nav and every grid. */
+    moveCatalogItem: function (kind, slug, by) {
+      var list = Store.catalog(kind);
+      var i = list.map(function (x) { return x.slug; }).indexOf(slug);
+      var to = i + by;
+      if (i < 0 || to < 0 || to >= list.length) return false;
+      list.splice(to, 0, list.splice(i, 1)[0]);
+      persist();
+      return true;
+    },
+
+    slugify: function (text) {
+      return String(text || '').trim().toLowerCase()
+        .replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+    },
+
+    /** A slug not already taken inside the same catalog. */
+    uniqueSlug: function (kind, wanted, ignore) {
+      var base = Store.slugify(wanted) || 'untitled';
+      var taken = Store.catalog(kind)
+        .filter(function (x) { return x.slug !== ignore; })
+        .map(function (x) { return x.slug; });
+      var slug = base, n = 2;
+      while (taken.indexOf(slug) > -1) { slug = base + '-' + n; n++; }
+      return slug;
+    },
+
+    /**
+     * The primary navigation, rebuilt from the catalogs so anything added in
+     * the admin appears in the header, the drawer and the footer.
+     */
+    nav: function () {
+      return [
+        { label: 'Services', children: state.services.map(function (s) {
+            return { label: s.short || s.name, href: 'service.html?s=' + s.slug }; }) },
+        { label: 'Industries', children: state.industries.map(function (i) {
+            return { label: i.name, href: 'industry.html?i=' + i.slug }; }) },
+        { label: 'Vehicles', children: state.vehicleTypes.map(function (v) {
+            return { label: v.name, href: 'vehicle.html?v=' + v.slug }; }) }
+      ].concat(FS.data.nav.slice(3));
     },
 
     newPartner: function () {

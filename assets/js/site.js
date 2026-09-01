@@ -38,7 +38,7 @@
      Header
      ------------------------------------------------------------------------ */
   function header() {
-    var desktopNav = FS.data.nav.map(function (group) {
+    var desktopNav = FS.store.nav().map(function (group) {
       return '<div class="nav-item">' +
         '<button class="nav-link" aria-haspopup="true" aria-expanded="false">' +
           FS.esc(group.label) + FS.icon('chevron-down') +
@@ -69,7 +69,7 @@
      Drawer — full navigation tree with expandable groups
      ------------------------------------------------------------------------ */
   function drawer() {
-    var groups = FS.data.nav.map(function (g) {
+    var groups = FS.store.nav().map(function (g) {
       return '<div class="drawer-group">' +
         '<button class="drawer-toggle" data-accordion aria-expanded="false">' +
           FS.esc(g.label) + FS.icon('chevron-down') +
@@ -107,7 +107,7 @@
      Footer
      ------------------------------------------------------------------------ */
   function footer() {
-    var services = FS.data.services.map(function (s) {
+    var services = FS.store.catalog('service').map(function (s) {
       return '<li><a href="' + FS.url('service.html?s=' + s.slug) + '">' + FS.esc(s.short) + '</a></li>';
     }).join('');
 

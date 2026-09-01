@@ -71,7 +71,7 @@
   function renderServices() {
     var host = document.getElementById('servicesGrid');
     if (!host) return;
-    host.innerHTML = D.services.slice(0, 6).map(function (s) {
+    host.innerHTML = FS.store.catalog('service').slice(0, 6).map(function (s) {
       return '<a class="svc-card" href="' + FS.url('service.html?s=' + s.slug) + '">' +
         '<div class="svc-media">' +
           '<img src="' + FS.url(s.image) + '" alt="' + FS.esc(s.name) + '" loading="lazy">' +
@@ -101,7 +101,7 @@
   function renderVehicles() {
     var host = document.getElementById('vehiclesGrid');
     if (!host) return;
-    host.innerHTML = D.vehicleTypes.map(function (v) {
+    host.innerHTML = FS.store.catalog('vehicle').map(function (v) {
       return '<a class="veh-item" href="' + FS.url('vehicle.html?v=' + v.slug) + '">' +
         '<img src="' + FS.url(v.image) + '" alt="' + FS.esc(v.name) + '" loading="lazy">' +
         '<span>' + FS.esc(v.name) + '</span>' +

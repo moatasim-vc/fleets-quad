@@ -1063,4 +1063,251 @@
     'Verify the business and add a bank account so Stripe can pay out to FleetSquad.',
     'Keep a test-mode key pair as well — the staging site runs on pk_test / sk_test.'
   ];
+  /* ======================================================================
+     SEO — the meta sheet supplied by the client
+     One entry per page of that document, in its order. This is the single
+     source of truth: the runtime setSeo() reads it, and the static <head>
+     of every fixed page is generated from it, so the two cannot drift.
+
+     `path` is the production URL the sheet specifies. It drives the
+     canonical / og:url. The prototype still serves these pages from their
+     .html filenames — the pretty URLs need a rewrite rule at the host.
+
+     `keywords` is the sheet's primary keyword first, then its secondary
+     keywords, de-duplicated.
+     ====================================================================== */
+  D.seo = {
+    /* 1 — Home */
+    'home': {
+      title: 'Mobile Fleet Repair | Diagnosis | Inspections',
+      description: 'Mobile fleet maintenance and repair for commercial vehicles. ASE Master Techs come to your location for PM service, diagnostics, inspections and repairs.',
+      keywords: 'mobile fleet repair, fleet maintenance services, commercial fleet maintenance, fleet mechanic',
+      path: ''
+    },
+
+    /* 2-8 — Services */
+    'service:preventive-maintenance': {
+      title: 'Preventive Fleet Maintenance Services | FleetSquad',
+      description: 'Keep your fleet on the road with mobile preventive maintenance. FleetSquad provides scheduled PM service for commercial trucks, vans and fleet vehicles.',
+      keywords: 'preventive fleet maintenance, fleet preventive maintenance, fleet PM service, commercial vehicle maintenance, mobile fleet maintenance',
+      path: 'preventive-fleet-maintenance/'
+    },
+    'service:mobile-fleet-repair': {
+      title: 'Mobile Fleet Repair Services | FleetSquad',
+      description: 'Mobile fleet repair for trucks, vans and commercial vehicles. ASE Master Techs come to your location to diagnose and repair fleet vehicles with less downtime.',
+      keywords: 'mobile fleet repair, fleet repair services, mobile fleet mechanic, commercial vehicle repair, onsite fleet repair',
+      path: 'mobile-fleet-repair/'
+    },
+    'service:mobile-diagnostics': {
+      title: 'Mobile Fleet Diagnostics & Vehicle Testing | FleetSquad',
+      description: 'Professional mobile fleet diagnostics at your location. Find engine, electrical, emissions and drivability problems quickly with advanced diagnostic equipment.',
+      keywords: 'mobile fleet diagnostics, fleet vehicle diagnostics, mobile truck diagnostics, commercial vehicle diagnostics, fleet diagnostic service',
+      path: 'mobile-fleet-diagnostics/'
+    },
+    'service:emergency-roadside': {
+      title: 'Emergency Fleet Roadside Assistance & Repair | FleetSquad',
+      description: 'Get commercial fleet vehicles back on the road with mobile roadside assistance and repair for trucks, vans and company vehicles. Request FleetSquad service.',
+      keywords: 'fleet roadside assistance, commercial roadside assistance, fleet roadside service, mobile truck repair, emergency fleet repair',
+      path: 'fleet-roadside-assistance/'
+    },
+    'service:scheduled-maintenance': {
+      title: 'Scheduled Fleet Maintenance Services | FleetSquad',
+      description: 'Put fleet maintenance on a reliable schedule. FleetSquad handles recurring service, inspections and preventive maintenance at your business or vehicle location.',
+      keywords: 'scheduled fleet maintenance, fleet maintenance program, fleet service schedule, commercial fleet maintenance, recurring fleet maintenance',
+      path: 'scheduled-fleet-maintenance/'
+    },
+    'service:mobile-inspections': {
+      // The sheet's description runs to 234 characters; Google shows about 160.
+      // Kept as written — flagged to the client rather than silently trimmed.
+      title: 'Mobile Vehicle Inspection Services | FleetSquad',
+      description: 'On-site fleet inspections for commercial trucks, vans and company vehicles. Identify safety, maintenance and repair issues before they cause costly downtime. Mobile same-day DOT inspections and pre-purchase inspections.',
+      keywords: 'fleet vehicle inspection, mobile fleet inspections, commercial vehicle inspection, fleet safety inspection, truck inspection service',
+      path: 'mobile-inspections/'
+    },
+    'service:pre-purchase-inspections': {
+      title: 'Commercial Fleet Pre-Purchase Inspections | FleetSquad',
+      description: 'Buying fleet vehicles? Get professional mobile pre-purchase inspections for commercial trucks, vans and vehicles before adding them to your fleet.',
+      keywords: 'fleet pre-purchase inspection, commercial vehicle pre purchase inspection, truck pre purchase inspection, mobile vehicle inspection',
+      path: 'fleet-pre-purchase-inspections/'
+    },
+
+    /* 9-13 — Vehicle types ("Built FleetSquad Tough") */
+    'vehicle:semi-trucks': {
+      title: 'Semi-Truck Fleet Maintenance & Mobile Repair | FleetSquad',
+      description: 'Mobile semi-truck fleet maintenance and repair at your location. Keep commercial trucks operating with preventive maintenance, diagnostics and inspections.',
+      keywords: 'semi truck fleet maintenance, mobile semi truck repair, commercial truck maintenance, fleet truck repair, mobile diesel mechanic',
+      path: 'semi-truck-fleet-maintenance/'
+    },
+    'vehicle:box-trucks': {
+      title: 'Box Truck Fleet Maintenance & Mobile Repair | FleetSquad',
+      description: "Mobile maintenance and repair for box truck fleets. FleetSquad provides scheduled service, diagnostics, inspections and repairs at your fleet's location.",
+      keywords: 'box truck fleet maintenance, box truck repair, mobile box truck repair, commercial truck maintenance, fleet truck service',
+      path: 'box-truck-fleet-maintenance/'
+    },
+    'vehicle:pickup-trucks': {
+      title: 'Pickup Truck Fleet Maintenance & Repair | FleetSquad',
+      description: 'Mobile fleet maintenance for commercial pickup trucks and work trucks. Get preventive maintenance, diagnostics, inspections and repairs at your location.',
+      keywords: 'pickup truck fleet maintenance, work truck fleet maintenance, pickup fleet repair, commercial pickup truck repair',
+      path: 'pickup-truck-fleet-maintenance/'
+    },
+    'vehicle:service-vans': {
+      title: 'Service Van Fleet Maintenance & Mobile Repair | FleetSquad',
+      description: 'Keep your service van fleet working with mobile maintenance and repair. FleetSquad services commercial vans at your yard, office or vehicle location.',
+      keywords: 'van fleet maintenance, service van maintenance, commercial van repair, fleet van repair, mobile van mechanic',
+      path: 'service-van-fleet-maintenance/'
+    },
+    'vehicle:passenger-cars': {
+      title: 'Commercial Car Fleet Maintenance & Repair | FleetSquad',
+      description: 'Mobile maintenance and repair for company car and passenger vehicle fleets. Reduce downtime with scheduled service, diagnostics and inspections on-site.',
+      keywords: 'car fleet maintenance, company vehicle maintenance, passenger fleet maintenance, corporate fleet maintenance, fleet car repair',
+      path: 'passenger-car-fleet-maintenance/'
+    },
+
+    /* 14-18 — Industries */
+    'industry:rental-car-fleets': {
+      title: 'Rental Car Fleet Maintenance & Repair Services | FleetSquad',
+      description: 'Mobile maintenance and repair for rental car fleets. Keep vehicles rental-ready with scheduled PM service, inspections, diagnostics and on-site repairs.',
+      keywords: 'rental car fleet maintenance, rental fleet maintenance, rental car fleet repair, vehicle rental fleet services',
+      path: 'rental-car-fleet-maintenance/'
+    },
+    'industry:trucking-fleets': {
+      title: 'Trucking Fleet Maintenance & Mobile Repair | FleetSquad',
+      description: 'Fleet maintenance and mobile repair for trucking companies. Reduce downtime with preventive maintenance, diagnostics, inspections and on-site truck service.',
+      keywords: 'trucking fleet maintenance, truck fleet maintenance, trucking company maintenance, commercial truck fleet repair',
+      path: 'trucking-fleet-repair/'
+    },
+    'industry:delivery-fleets': {
+      title: 'Delivery Fleet Maintenance & Mobile Repair | FleetSquad',
+      description: 'Keep delivery vehicles moving with mobile fleet maintenance, inspections, diagnostics and repair services for vans, trucks and commercial delivery fleets.',
+      keywords: 'delivery fleet maintenance, delivery vehicle maintenance, delivery van fleet maintenance, last mile fleet maintenance',
+      path: 'delivery-fleet-repair/'
+    },
+    'industry:corporate-fleets': {
+      title: 'Corporate Fleet Maintenance Services | FleetSquad',
+      description: 'Mobile fleet maintenance for businesses with company vehicles. FleetSquad provides scheduled service, inspections, diagnostics and repairs at your location.',
+      keywords: 'corporate fleet maintenance, company fleet maintenance, business fleet services, company vehicle maintenance',
+      path: 'corporate-fleet-maintenance/'
+    },
+    'industry:construction-fleets': {
+      title: 'Construction Fleet Maintenance & Mobile Repair | FleetSquad',
+      description: 'Mobile maintenance and repair for construction fleet vehicles and work trucks. Reduce downtime with on-site PM service, inspections and diagnostics.',
+      keywords: 'construction fleet maintenance, construction truck maintenance, work truck fleet maintenance, construction fleet repair',
+      path: 'construction-fleet-maintenance/'
+    },
+
+    /* 19-23, 28-30 — Company pages. These also seed the CMS records, so an
+       admin can rewrite them from Admin -> CMS Pages. */
+    'cms:about': {
+      title: 'About FleetSquad | Mobile Fleet Maintenance Experts',
+      description: 'Learn about FleetSquad and our mission to keep commercial fleets moving with professional mobile maintenance, diagnostics, inspections and repair services.',
+      keywords: 'FleetSquad',
+      path: 'about/'
+    },
+    'cms:service-areas': {
+      title: 'Mobile Fleet Maintenance Service Areas | FleetSquad',
+      description: 'Explore FleetSquad mobile fleet maintenance and repair service areas. Find professional on-site fleet service for commercial vehicles in your market.',
+      keywords: 'mobile fleet maintenance service areas',
+      path: 'service-areas/'
+    },
+    'cms:careers': {
+      title: 'Fleet Mechanic Careers & Technician Jobs | FleetSquad',
+      description: 'Explore FleetSquad careers for experienced automotive, diesel and fleet technicians. Help commercial fleets stay mission-ready with professional mobile service.',
+      keywords: 'fleet mechanic jobs, mobile mechanic jobs, fleet technician jobs, diesel mechanic jobs',
+      path: 'careers/'
+    },
+    'cms:partners': {
+      // 190 characters — over the ~160 Google renders. Flagged to the client.
+      title: 'Fleet Service Partnerships | FleetSquad',
+      description: 'Partner with FleetSquad to deliver scalable mobile maintenance and repair solutions for commercial vehicle fleets and multi-location businesses. We are proud to partner with MobileMechanic.com',
+      keywords: 'fleet service partnership',
+      path: 'partners/'
+    },
+    'cms:contact': {
+      title: 'Contact FleetSquad | Mobile Fleet Service',
+      description: 'Contact FleetSquad for mobile fleet maintenance, repairs, diagnostics, inspections and commercial vehicle service. Request service for your fleet today.',
+      keywords: 'mobile fleet service',
+      path: 'contact/'
+    },
+    'cms:faqs': {
+      title: 'Fleet Maintenance & Mobile Repair FAQs | FleetSquad',
+      description: 'Get answers about mobile fleet maintenance, commercial vehicle repairs, scheduling, inspections, preventive maintenance and FleetSquad service.',
+      keywords: 'fleet maintenance FAQ',
+      path: 'fleet-maintenance-faq/'
+    },
+    'cms:privacy': {
+      title: 'Privacy Policy | FleetSquad',
+      description: 'Read the FleetSquad privacy policy and learn how information is collected, used and protected when using FleetSquad services and websites.',
+      keywords: 'privacy policy, fleetsquad privacy',
+      path: 'privacy-policy/'
+    },
+    'cms:terms': {
+      title: 'Terms of Service | FleetSquad',
+      description: "Review the terms and conditions governing the use of FleetSquad's website, mobile fleet maintenance platform and related services.",
+      keywords: 'terms of service, fleetsquad terms',
+      path: 'terms-of-service/'
+    },
+
+    /* 24 — Get Estimate. Every blue Get Estimate button points here. */
+    'estimate': {
+      title: 'Get a Mobile Fleet Maintenance & Repair Estimate | FleetSquad',
+      description: 'Request a mobile fleet maintenance or repair estimate from FleetSquad. Tell us about your commercial vehicles and service needs to get started. Same-day service available.',
+      keywords: 'mobile fleet maintenance estimate, mobile fleet repair quote, fleet maintenance quote, commercial vehicle repair estimate',
+      path: 'signup/'
+    },
+
+    /* 26 — Portal sign-in. The sheet marks it noindex, which it already is. */
+    'login': {
+      title: 'Fleet Management Dashboard | FleetSquad',
+      description: 'Access your FleetSquad dashboard to review fleet service activity, completed repairs, maintenance history and vehicle service information.',
+      keywords: '',
+      path: 'fleet-dashboard/',
+      noindex: true
+    },
+
+    /* 27 — Blog index */
+    'blog': {
+      title: 'Fleet Maintenance & Repair Blog | FleetSquad',
+      description: 'Fleet maintenance tips, commercial vehicle repair information, preventive maintenance guides and fleet management resources from FleetSquad.',
+      keywords: 'fleet maintenance blog',
+      path: 'blog/'
+    }
+  };
+
+  /**
+   * One entry from the meta sheet.
+   * @param {string} key e.g. 'service:mobile-fleet-repair'
+   * @returns {{title:string,description:string,keywords:string,path:string}|null}
+   */
+  D.seoFor = function (key) { return D.seo[key] || null; };
+
+  /* The sheet is also the source for the CMS page records, so what an admin
+     opens in Admin -> CMS Pages is what the sheet says. */
+  D.cmsPages.forEach(function (p) {
+    var entry = D.seo['cms:' + p.slug];
+    if (!entry) return;
+    p.metaTitle = entry.title;
+    p.metaDescription = entry.description;
+    p.keywords = entry.keywords;
+    p.path = entry.path;
+  });
+
+  /* Services, industries and vehicle types are editable in the admin, so each
+     record carries its own SEO block rather than looking one up by slug — a
+     service an admin adds gets an editable meta record like any other. The
+     sheet seeds the ones it lists; anything new starts from the name. */
+  function attachSeo(list, kind, fallbackPath) {
+    list.forEach(function (item) {
+      var entry = D.seo[kind + ':' + item.slug];
+      item.seo = entry
+        ? { title: entry.title, description: entry.description,
+            keywords: entry.keywords, path: entry.path }
+        : { title: item.name + ' | FleetSquad',
+            description: item.excerpt || '',
+            keywords: item.name.toLowerCase(),
+            path: fallbackPath + item.slug + '/' };
+    });
+  }
+  attachSeo(D.services, 'service', '');
+  attachSeo(D.industries, 'industry', '');
+  attachSeo(D.vehicleTypes, 'vehicle', '');
 })(window);

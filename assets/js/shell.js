@@ -33,6 +33,9 @@
           { view: 'payments',      label: 'Payments',      icon: 'credit-card', href: 'admin/payments.html' }
         ] },
         { title: 'Content', items: [
+          { view: 'services',      label: 'Services',      icon: 'gear-wrench', href: 'admin/services.html' },
+          { view: 'industries',    label: 'Industries',    icon: 'building',    href: 'admin/industries.html' },
+          { view: 'vehicles',      label: 'Vehicle Types', icon: 'truck',       href: 'admin/vehicles.html' },
           { view: 'blog',          label: 'Blog',          icon: 'edit',        href: 'admin/blog.html' },
           { view: 'service-areas', label: 'Service Areas', icon: 'map',         href: 'admin/service-areas.html' },
           { view: 'reviews',       label: 'Reviews',       icon: 'review',      href: 'admin/reviews.html', count: 'pendingReviews' },
@@ -101,8 +104,13 @@
   var role = document.body.dataset.role;
   var view = document.body.dataset.view;
   // Sub-screens keep their parent's sidebar item highlighted.
+  /* An editor keeps its list item lit in the sidebar. The catalog editor
+     serves all three catalogs, so which parent it belongs to comes from ?t=. */
   var VIEW_PARENT = { 'blog-edit': 'blog' };
-  var navView = VIEW_PARENT[view] || view;
+  var CATALOG_PARENT = { service: 'services', industry: 'industries', vehicle: 'vehicles' };
+  var navView = view === 'catalog-edit'
+    ? (CATALOG_PARENT[FS.param('t')] || 'services')
+    : (VIEW_PARENT[view] || view);
   var config = NAV[role];
   if (!config) return;
 

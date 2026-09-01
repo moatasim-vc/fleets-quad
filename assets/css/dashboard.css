@@ -653,3 +653,44 @@ body.is-impersonating .sidebar { top: 42px; height: calc(100dvh - 42px); }
   font-size: var(--fs-sm);
 }
 .map-empty svg { width: 22px; height: 22px; }
+
+/* --------------------------------------------------------------------------
+   Catalog CMS — services, industries and vehicle types
+   -------------------------------------------------------------------------- */
+
+/* Reorder arrows in the list */
+.order-cell { display: inline-flex; flex-direction: column; gap: 3px; }
+.order-cell .btn { padding: 3px 7px; line-height: 1; }
+.order-cell .btn[disabled] { opacity: .35; pointer-events: none; }
+.order-cell svg { width: 13px; height: 13px; }
+
+/* Thumbnail beside the name */
+.cat-thumb {
+  flex: none;
+  width: 44px; height: 44px;
+  border-radius: var(--r-sm);
+  border: 1px solid var(--line);
+  background: var(--surface-3);
+  overflow: hidden;
+  display: flex; align-items: center; justify-content: center;
+  color: var(--ink-400);
+}
+.cat-thumb img { width: 100%; height: 100%; object-fit: cover; }
+.cat-thumb svg { width: 20px; height: 20px; }
+
+/* One-line repeating rows (the "what is included" list) */
+.repeater--tight { gap: 8px; }
+.repeat-row { display: flex; gap: 8px; align-items: center; }
+.repeat-row .input { flex: 1 1 auto; min-width: 0; }
+.repeat-row .btn { flex: none; padding: 8px 10px; }
+.repeat-row svg { width: 14px; height: 14px; }
+
+/* Icon picker preview */
+.icon-preview {
+  display: flex; align-items: center; justify-content: center;
+  width: 52px; height: 52px;
+  border-radius: var(--r-md);
+  background: var(--blue-050);
+  color: var(--blue-600);
+}
+.icon-preview svg { width: 24px; height: 24px; }

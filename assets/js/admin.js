@@ -1479,8 +1479,9 @@
         '<div class="grid grid-3 mt-6">' +
           '<div class="card card-pad"><span class="kpi-icon mb-3">' + FS.icon('file-text') + '</span>' +
             '<h4 class="mb-2">SEO templates</h4><p class="text-muted text-sm mb-0">' +
-            (D.services.length + D.industries.length + D.vehicleTypes.length) +
-            ' service, industry and vehicle pages generated from one reusable template, each with its own title and description.</p></div>' +
+            (Store.catalog('service').length + Store.catalog('industry').length + Store.catalog('vehicle').length) +
+            ' service, industry and vehicle pages, each with its own copy and search-engine record. ' +
+            'Edit them under Services, Industries and Vehicle Types.</p></div>' +
           '<a class="card card-pad card-hover" href="' + FS.url('admin/blog.html') + '"><span class="kpi-icon mb-3">' + FS.icon('list') + '</span>' +
             '<h4 class="mb-2">Blog posts</h4><p class="text-muted text-sm mb-0">' + Store.posts('published').length +
             ' published across ' + D.postCategories.length + ' categories. Edit copy, SEO and article links.</p></a>' +
@@ -2193,7 +2194,7 @@
                       '<input type="file" accept="image/*" id="beImgFile"></label>' +
                     '<select class="select" id="beImgLibrary">' +
                       '<option value="">Or pick from the library…</option>' +
-                      D.services.map(function (s) {
+                      Store.catalog('service').map(function (s) {
                         return '<option value="' + FS.esc(s.image) + '"' +
                           (s.image === post.image ? ' selected' : '') + '>' + FS.esc(s.name) + '</option>';
                       }).join('') + '</select>' +
@@ -2660,6 +2661,479 @@
     }
   }
 
+
+  /* ======================================================================
+     Catalog — Services, Industries and Vehicle Types
+     All three are the same shape of thing: a record that drives a public
+     template page, an entry in the nav and a card on an index. So one list
+     view and one editor serve all three, switched by `kind`.
+     ====================================================================== */
+
+  /** Which catalog this page is for, from <body data-catalog="…">. */
+  function catalogKind() {
+    return document.body.dataset.catalog || FS.param('t') || 'service';
+  }
+
+  function catalogList() {
+    var kind = catalogKind();
+    var meta = Store.catalogMeta[kind];
+    render();
+
+    function render() {
+      var items = Store.catalog(kind);
+      var plural = meta.label + (meta.label.slice(-1) === 'y' ? '' : 's');
+      if (meta.label.slice(-1) === 'y') plural = meta.label.slice(0, -1) + 'ies';
+
+      host.innerHTML =
+        '<div class="page-head"><div><h2>' + FS.esc(plural) + '</h2>' +
+          '<p>Every ' + FS.esc(meta.label.toLowerCase()) + ' on the public site. The order here is the order ' +
+            'in the nav bar, the footer and the index page.</p></div>' +
+          '<div class="page-head-actions">' +
+            '<button class="btn btn-primary" id="ctAdd">' + FS.icon('plus') + 'Add ' + FS.esc(meta.label.toLowerCase()) + '</button>' +
+          '</div>' +
+        '</div>' +
+
+        (items.length
+          ? '<div class="table-wrap"><div class="scroll-x">' +
+            '<table class="table table--stack"><thead><tr>' +
+              '<th>Order</th><th>' + FS.esc(meta.label) + '</th><th>Address</th>' +
+              '<th>Meta title</th><th class="td-actions">Actions</th>' +
+            '</tr></thead><tbody>' + items.map(function (it, i) {
+              var seo = it.seo || {};
+              var tLen = (seo.title || '').length;
+              var dLen = (seo.description || '').length;
+              var seoOk = tLen >= 25 && tLen <= 62 && dLen >= 90 && dLen <= 165;
+              return '<tr>' +
+                '<td data-label="Order"><div class="order-cell">' +
+                  '<button class="btn btn-xs btn-outline" data-ctmove="-1" data-slug="' + FS.esc(it.slug) + '" ' +
+                    'aria-label="Move up"' + (i === 0 ? ' disabled' : '') + '>' + FS.icon('chevron-up') + '</button>' +
+                  '<button class="btn btn-xs btn-outline" data-ctmove="1" data-slug="' + FS.esc(it.slug) + '" ' +
+                    'aria-label="Move down"' + (i === items.length - 1 ? ' disabled' : '') + '>' + FS.icon('chevron-down') + '</button>' +
+                '</div></td>' +
+                '<td data-label="' + FS.esc(meta.label) + '" class="td-strong">' +
+                  '<div class="row" style="gap:10px">' +
+                    (it.image
+                      ? '<span class="cat-thumb"><img src="' + FS.esc(FS.url(it.image)) + '" alt=""></span>'
+                      : '<span class="cat-thumb">' + FS.icon(it.icon || 'truck-wrench') + '</span>') +
+                    '<span><strong>' + FS.esc(it.name) + '</strong>' +
+                    '<br><small class="text-xs text-dim">' +
+                      (it.bullets || []).length + ' bullets · ' +
+                      ((it.features || []).length ? (it.features.length + ' features') :
+                       (it.stats || []).length ? (it.stats.length + ' stats') : 'no panel') +
+                    '</small></span>' +
+                  '</div></td>' +
+                '<td data-label="Address"><code class="text-sm text-dim">/' + FS.esc(it.slug) + '</code></td>' +
+                '<td data-label="Meta title"><span class="text-sm">' + FS.esc(seo.title || '—') + '</span><br>' +
+                  '<small class="text-xs ' + (seoOk ? 'text-ok' : 'text-dim') + '">' +
+                  'Title ' + tLen + '/60 · Description ' + dLen + '/160</small></td>' +
+                '<td class="td-actions" data-label="Actions">' +
+                  '<a class="btn btn-xs btn-outline" href="' + FS.url(meta.page + '?' + meta.param + '=' + it.slug) + '" ' +
+                    'target="_blank" rel="noopener">' + FS.icon('external') + 'View</a> ' +
+                  '<a class="btn btn-xs btn-primary" href="' + FS.url('admin/catalog-edit.html?t=' + kind + '&s=' + it.slug) + '">' +
+                    FS.icon('edit') + 'Edit</a> ' +
+                  '<button class="btn btn-xs btn-danger" data-ctdel="' + FS.esc(it.slug) + '">' +
+                    FS.icon('trash') + '</button>' +
+                '</td></tr>';
+            }).join('') + '</tbody></table></div></div>'
+          : '<div class="empty-state">' + FS.icon('list') +
+            '<h4>Nothing here yet</h4><p>Add the first ' + FS.esc(meta.label.toLowerCase()) + ' to put it on the site.</p></div>');
+
+      document.getElementById('ctAdd').addEventListener('click', function () {
+        var item = Store.createCatalogItem(kind);
+        FS.toast(meta.label + ' created', 'Fill in the details and save.', 'ok');
+        window.location.href = FS.url('admin/catalog-edit.html?t=' + kind + '&s=' + item.slug);
+      });
+
+      FS.$$('[data-ctmove]', host).forEach(function (b) {
+        b.addEventListener('click', function () {
+          Store.moveCatalogItem(kind, b.dataset.slug, Number(b.dataset.ctmove));
+          render();
+          FS.hydrateIcons(host);
+        });
+      });
+
+      FS.$$('[data-ctdel]', host).forEach(function (b) {
+        b.addEventListener('click', function () {
+          var item = Store.catalogItem(kind, b.dataset.ctdel);
+          FS.confirm('Delete ' + item.name + '?',
+            'The page at /' + item.slug + ' goes away and it drops out of the nav bar, ' +
+            'the footer and the index. This cannot be undone.',
+            function () {
+              Store.deleteCatalogItem(kind, item.slug);
+              FS.toast(meta.label + ' deleted', item.name, 'ok');
+              render();
+              FS.hydrateIcons(host);
+            }, true);
+        });
+      });
+
+      FS.hydrateIcons(host);
+    }
+  }
+
+  /* ----------------------------------------------------------------------
+     Catalog editor
+     Everything the public template renders: the copy, the picture, the
+     bullet list, the feature or stat panel, and the search-engine record.
+     ---------------------------------------------------------------------- */
+
+  function catalogEdit() {
+    var kind = FS.param('t') || 'service';
+    var meta = Store.catalogMeta[kind];
+    var slug = FS.param('s');
+    var item = meta && Store.catalogItem(kind, slug);
+
+    if (!item) {
+      host.innerHTML = '<div class="empty-state">' + FS.icon('help-circle') +
+        '<h4>Not found</h4><p>That record no longer exists.</p>' +
+        '<a class="btn btn-primary mt-6" href="' + FS.url('admin/services.html') + '">Back to services</a></div>';
+      return;
+    }
+
+    /* Working copies of the repeating parts; committed on save. */
+    var bullets = (item.bullets || []).slice();
+    var panel = ((kind === 'industry' ? item.stats : item.features) || [])
+      .map(function (x) { return Object.assign({}, x); });
+
+    render();
+
+    function listHref() {
+      return FS.url('admin/' + (kind === 'service' ? 'services' : kind === 'industry' ? 'industries' : 'vehicles') + '.html');
+    }
+
+    function render() {
+      var seo = item.seo || {};
+      host.innerHTML =
+        '<nav class="crumbs crumbs--dark"><a href="' + listHref() + '">' + FS.esc(meta.label) + 's</a>' +
+          '<span>/</span><strong>' + FS.esc(item.name) + '</strong></nav>' +
+
+        '<div class="page-head"><div><h2>Edit ' + FS.esc(meta.label.toLowerCase()) + '</h2>' +
+          '<p>/' + FS.esc(item.slug) + '</p></div>' +
+          '<div class="page-head-actions">' +
+            '<a class="btn btn-outline" href="' + FS.url(meta.page + '?' + meta.param + '=' + item.slug) + '" ' +
+              'target="_blank" rel="noopener">' + FS.icon('external') + 'Preview</a>' +
+            '<button class="btn btn-primary" id="ceSave">' + FS.icon('check') + 'Save</button>' +
+          '</div></div>' +
+
+        '<form id="ceForm"><div class="dash-grid dash-grid--2-1">' +
+
+          '<div>' +
+            /* --- Copy ------------------------------------------------- */
+            '<div class="card mb-5"><div class="card-head"><h3>Content</h3></div><div class="card-body">' +
+              '<div class="field-row field-row-2">' +
+                '<div class="field"><label class="label" for="ceName">Name</label>' +
+                  '<input class="input" id="ceName" name="name" value="' + FS.esc(item.name) + '">' +
+                  '<p class="hint">Shown on the index card and in the nav bar.</p></div>' +
+                '<div class="field"><label class="label" for="ceShort">Short name</label>' +
+                  '<input class="input" id="ceShort" name="short" value="' + FS.esc(item.short || '') + '">' +
+                  '<p class="hint">Used where space is tight. Blank falls back to the name.</p></div>' +
+              '</div>' +
+              '<div class="field"><label class="label" for="ceSlug">URL slug</label>' +
+                '<div class="row" style="gap:8px"><span class="text-dim text-sm">/</span>' +
+                '<input class="input" id="ceSlug" name="slug" value="' + FS.esc(item.slug) + '"></div>' +
+                '<p class="hint">Changing this changes the page address. Existing links will break.</p></div>' +
+              '<div class="field"><label class="label" for="ceExcerpt">Card text</label>' +
+                '<textarea class="textarea" id="ceExcerpt" name="excerpt" style="min-height:70px">' +
+                FS.esc(item.excerpt || '') + '</textarea>' +
+                '<p class="hint">One line, shown on the index grid and the homepage.</p></div>' +
+              '<div class="field"><label class="label" for="ceHero">Page headline (H1)</label>' +
+                '<input class="input" id="ceHero" name="hero" value="' + FS.esc(item.hero || '') + '"></div>' +
+              '<div class="field mb-0"><label class="label" for="ceIntro">Opening paragraph</label>' +
+                '<textarea class="textarea" id="ceIntro" name="intro" style="min-height:120px">' +
+                FS.esc(item.intro || '') + '</textarea></div>' +
+            '</div></div>' +
+
+            /* --- Bullets ---------------------------------------------- */
+            '<div class="card mb-5"><div class="card-head"><h3>What is included</h3>' +
+              '<button type="button" class="btn btn-sm btn-outline" id="ceAddBullet">' +
+                FS.icon('plus') + 'Add line</button></div><div class="card-body">' +
+              '<p class="text-muted text-sm mb-4">The ticked list on the page. One line each.</p>' +
+              '<div class="repeater repeater--tight" id="ceBullets"></div>' +
+            '</div></div>' +
+
+            /* --- Feature / stat panel --------------------------------- */
+            '<div class="card"><div class="card-head"><h3>' +
+              (kind === 'industry' ? 'Headline numbers' : 'Feature panel') + '</h3>' +
+              '<button type="button" class="btn btn-sm btn-outline" id="ceAddPanel">' +
+                FS.icon('plus') + 'Add ' + (kind === 'industry' ? 'number' : 'feature') + '</button></div>' +
+              '<div class="card-body">' +
+              '<p class="text-muted text-sm mb-4">' +
+                (kind === 'industry'
+                  ? 'The three figures across the top of the page — a value and its label.'
+                  : 'The four-up grid under the introduction. Each one has an icon, a heading and a line of text.') +
+              '</p>' +
+              '<div class="repeater" id="cePanel"></div>' +
+            '</div></div>' +
+          '</div>' +
+
+          '<div>' +
+            /* --- Picture / icon --------------------------------------- */
+            '<div class="card mb-5"><div class="card-head"><h3>Picture</h3></div><div class="card-body">' +
+              '<div class="field"><span class="label">Image</span>' +
+                '<div class="img-picker">' +
+                  '<span class="img-preview" id="ceImgPreview">' +
+                    (item.image ? '<img src="' + FS.esc(FS.url(item.image)) + '" alt="">' : FS.icon('image')) +
+                  '</span>' +
+                  '<div class="img-picker-tools">' +
+                    '<label class="btn btn-sm btn-outline btn-file">' + FS.icon('upload') + 'Upload' +
+                      '<input type="file" accept="image/*" id="ceImgFile"></label>' +
+                  '</div>' +
+                '</div>' +
+                '<input type="hidden" id="ceImage" name="image" value="' + FS.esc(item.image || '') + '">' +
+                '<div class="field mt-4 mb-0"><label class="label" for="ceImgUrl">Or paste an address</label>' +
+                  '<input class="input" id="ceImgUrl" ' +
+                  'value="' + FS.esc(/^data:/.test(item.image || '') ? '' : (item.image || '')) + '" ' +
+                  'placeholder="assets/img/services/example.jpg"></div>' +
+                '<p class="hint" id="ceImgHint">Any size — it is resized on upload and cropped to fit.</p>' +
+              '</div>' +
+              '<div class="field mb-0"><label class="label" for="ceIcon">Icon</label>' +
+                '<select class="select" id="ceIcon" name="icon">' +
+                  FS.iconNames().map(function (n) {
+                    return '<option value="' + FS.esc(n) + '"' + (n === item.icon ? ' selected' : '') + '>' +
+                      FS.esc(n) + '</option>';
+                  }).join('') + '</select>' +
+                '<div class="icon-preview mt-3" id="ceIconPreview"></div></div>' +
+            '</div></div>' +
+
+            /* --- SEO -------------------------------------------------- */
+            '<div class="card"><div class="card-head"><h3>Search engine listing</h3>' +
+              '<span class="text-sm text-muted" id="ceSeoCount"></span></div><div class="card-body">' +
+              '<div class="serp-preview" id="ceSerp"></div>' +
+              '<div class="field mt-5"><label class="label" for="ceMetaTitle">Meta title</label>' +
+                '<input class="input" id="ceMetaTitle" name="metaTitle" value="' + FS.esc(seo.title || '') + '">' +
+                '<p class="hint">Aim for 50–60 characters.</p></div>' +
+              '<div class="field"><label class="label" for="ceMetaDesc">Meta description</label>' +
+                '<textarea class="textarea" id="ceMetaDesc" name="metaDescription" style="min-height:90px">' +
+                FS.esc(seo.description || '') + '</textarea>' +
+                '<p class="hint">Aim for 140–160 characters.</p></div>' +
+              '<div class="field"><label class="label" for="ceKeywords">Keywords</label>' +
+                '<input class="input" id="ceKeywords" name="keywords" value="' + FS.esc(seo.keywords || '') + '">' +
+                '<p class="hint">Primary keyword first, then the secondaries.</p></div>' +
+              '<div class="field mb-0"><label class="label" for="cePath">Page address</label>' +
+                '<div class="row" style="gap:6px"><span class="text-dim text-sm">fleetsquad.com/</span>' +
+                '<input class="input" id="cePath" name="path" value="' + FS.esc(seo.path || '') + '"></div>' +
+                '<p class="hint">The canonical URL this page declares.</p></div>' +
+            '</div></div>' +
+          '</div>' +
+
+        '</div></form>';
+
+      paintBullets();
+      paintPanel();
+      wire();
+    }
+
+    /* --- Bullets ------------------------------------------------------ */
+    function collectBullets() {
+      bullets = FS.$$('#ceBullets [data-bullet]', host).map(function (i) { return i.value.trim(); });
+    }
+    function paintBullets() {
+      var list = document.getElementById('ceBullets');
+      list.innerHTML = bullets.length
+        ? bullets.map(function (b, i) {
+            return '<div class="repeat-row" data-i="' + i + '">' +
+              '<input class="input" data-bullet aria-label="Line ' + (i + 1) + '" ' +
+              'value="' + FS.esc(b) + '" placeholder="Something this covers">' +
+              '<button type="button" class="btn btn-xs btn-danger" data-bulletdel ' +
+                'aria-label="Remove line">' + FS.icon('trash') + '</button></div>';
+          }).join('')
+        : '<p class="text-dim text-sm">No lines yet.</p>';
+      FS.hydrateIcons(list);
+      FS.$$('[data-bulletdel]', list).forEach(function (b) {
+        b.addEventListener('click', function () {
+          collectBullets();
+          bullets.splice(Number(b.closest('.repeat-row').dataset.i), 1);
+          paintBullets();
+        });
+      });
+    }
+
+    /* --- Feature / stat panel ----------------------------------------- */
+    function collectPanel() {
+      FS.$$('#cePanel .repeat-item', host).forEach(function (el) {
+        var row = panel[Number(el.dataset.i)];
+        if (!row) return;
+        if (kind === 'industry') {
+          row.v = el.querySelector('[data-pv]').value.trim();
+          row.l = el.querySelector('[data-pl]').value.trim();
+        } else {
+          row.icon = el.querySelector('[data-picon]').value;
+          row.title = el.querySelector('[data-ptitle]').value.trim();
+          row.text = el.querySelector('[data-ptext]').value.trim();
+        }
+      });
+    }
+    function paintPanel() {
+      var list = document.getElementById('cePanel');
+      list.innerHTML = panel.length
+        ? panel.map(function (p, i) {
+            var inner = kind === 'industry'
+              ? '<div class="field-row field-row-2">' +
+                  '<div class="field mb-0"><span class="label">Value</span>' +
+                    '<input class="input" data-pv aria-label="Value" value="' + FS.esc(p.v || '') + '" placeholder="4.2 hrs"></div>' +
+                  '<div class="field mb-0"><span class="label">Label</span>' +
+                    '<input class="input" data-pl aria-label="Label" value="' + FS.esc(p.l || '') + '" placeholder="Average turnaround"></div>' +
+                '</div>'
+              : '<div class="field-row field-row-2">' +
+                  '<div class="field"><span class="label">Icon</span>' +
+                    '<select class="select" data-picon aria-label="Icon">' +
+                      FS.iconNames().map(function (n) {
+                        return '<option value="' + FS.esc(n) + '"' + (n === p.icon ? ' selected' : '') + '>' + FS.esc(n) + '</option>';
+                      }).join('') + '</select></div>' +
+                  '<div class="field"><span class="label">Heading</span>' +
+                    '<input class="input" data-ptitle aria-label="Heading" value="' + FS.esc(p.title || '') + '"></div>' +
+                '</div>' +
+                '<div class="field mb-0"><span class="label">Text</span>' +
+                  '<textarea class="textarea" data-ptext aria-label="Text" style="min-height:56px">' + FS.esc(p.text || '') + '</textarea></div>';
+            return '<div class="repeat-item repeat-item--block" data-i="' + i + '">' +
+              '<div class="repeat-fields">' + inner + '</div>' +
+              '<div class="repeat-actions">' +
+                '<button type="button" class="btn btn-xs btn-danger" data-paneldel ' +
+                  'aria-label="Remove">' + FS.icon('trash') + '</button>' +
+              '</div></div>';
+          }).join('')
+        : '<p class="text-dim text-sm">Nothing here yet.</p>';
+      FS.hydrateIcons(list);
+      FS.$$('[data-paneldel]', list).forEach(function (b) {
+        b.addEventListener('click', function () {
+          collectPanel();
+          panel.splice(Number(b.closest('.repeat-item').dataset.i), 1);
+          paintPanel();
+        });
+      });
+    }
+
+    /* --- Wiring -------------------------------------------------------- */
+    function wire() {
+      var name = document.getElementById('ceName');
+      var shortField = document.getElementById('ceShort');
+      var mt = document.getElementById('ceMetaTitle');
+      var md = document.getElementById('ceMetaDesc');
+      var pathField = document.getElementById('cePath');
+
+      /* The short name is what the nav bar and footer show. Rename the record
+         and it follows along, until someone types a different one by hand —
+         otherwise the menus keep showing the old name and look broken. */
+      var shortIsAuto = !shortField.value.trim() || shortField.value.trim() === item.name;
+      shortField.addEventListener('input', function () { shortIsAuto = false; });
+      name.addEventListener('input', function () {
+        if (shortIsAuto) shortField.value = name.value;
+      });
+
+      function paintSerp() {
+        var t = mt.value || (name.value + ' | FleetSquad');
+        var d = md.value || document.getElementById('ceExcerpt').value;
+        document.getElementById('ceSerp').innerHTML =
+          '<div class="serp-url">fleetsquad.com › ' + FS.esc(String(pathField.value).replace(/[/]$/, '')) + '</div>' +
+          '<div class="serp-title">' + FS.esc(t.slice(0, 62)) + (t.length > 62 ? '…' : '') + '</div>' +
+          '<div class="serp-desc">' + FS.esc(d.slice(0, 165)) + (d.length > 165 ? '…' : '') + '</div>';
+        document.getElementById('ceSeoCount').textContent =
+          'Title ' + t.length + '/60 · Description ' + d.length + '/160';
+      }
+      [name, mt, md, pathField, document.getElementById('ceExcerpt')].forEach(function (el) {
+        el.addEventListener('input', paintSerp);
+      });
+      paintSerp();
+
+      var iconSel = document.getElementById('ceIcon');
+      function paintIcon() {
+        document.getElementById('ceIconPreview').innerHTML = FS.icon(iconSel.value);
+      }
+      iconSel.addEventListener('change', paintIcon);
+      paintIcon();
+
+      /* Picture */
+      var image = document.getElementById('ceImage');
+      var preview = document.getElementById('ceImgPreview');
+      var urlField = document.getElementById('ceImgUrl');
+      function setImage(v, note) {
+        image.value = v || '';
+        preview.innerHTML = v ? '<img src="' + FS.esc(FS.url(v)) + '" alt="">' : FS.icon('image');
+        FS.hydrateIcons(preview);
+        if (note) document.getElementById('ceImgHint').textContent = note;
+      }
+      document.getElementById('ceImgFile').addEventListener('change', function () {
+        var file = this.files[0];
+        if (!file) return;
+        FS.readImage(file, 1400, function (url, err, info) {
+          if (err) { FS.toast('Could not use that file', err, 'warn'); return; }
+          setImage(url, info.width + '×' + info.height + ' · about ' + Math.round(info.bytes / 1024) + ' KB.');
+          urlField.value = '';
+        });
+      });
+      urlField.addEventListener('input', function () { setImage(this.value.trim(), 'Loaded from an address.'); });
+
+      document.getElementById('ceAddBullet').addEventListener('click', function () {
+        collectBullets();
+        bullets.push('');
+        paintBullets();
+        var last = host.querySelector('#ceBullets .repeat-row:last-child [data-bullet]');
+        if (last) last.focus();
+      });
+      document.getElementById('ceAddPanel').addEventListener('click', function () {
+        collectPanel();
+        panel.push(kind === 'industry' ? { v: '', l: '' } : { icon: 'check-circle', title: '', text: '' });
+        paintPanel();
+      });
+
+      document.getElementById('ceSave').addEventListener('click', save);
+      FS.hydrateIcons(host);
+    }
+
+    function save() {
+      collectBullets();
+      collectPanel();
+      var form = FS.formData(document.getElementById('ceForm'));
+
+      if (!String(form.name).trim()) {
+        FS.toast('A name is needed', 'Every ' + meta.label.toLowerCase() + ' needs a name.', 'warn');
+        return;
+      }
+
+      // Keep the slug URL-safe and unique inside this catalog.
+      var newSlug = Store.uniqueSlug(kind, form.slug || form.name, item.slug);
+
+      var patch = {
+        slug: newSlug,
+        name: form.name,
+        short: form.short || form.name,
+        icon: form.icon,
+        image: form.image,
+        excerpt: form.excerpt,
+        hero: form.hero || form.name,
+        intro: form.intro,
+        bullets: bullets.filter(Boolean),
+        seo: {
+          title: form.metaTitle,
+          description: form.metaDescription,
+          keywords: form.keywords,
+          path: String(form.path || newSlug + '/').replace(/^[/]/, '')
+        }
+      };
+      if (kind === 'industry') {
+        patch.stats = panel.filter(function (p) { return p.v || p.l; });
+      } else {
+        patch.features = panel.filter(function (p) { return p.title || p.text; });
+      }
+
+      Store.saveCatalogItem(kind, item.slug, patch);
+      item = Store.catalogItem(kind, newSlug);
+
+      if (!Store.lastWriteOk) {
+        FS.toast('Saved, but not kept', 'This browser refused the write — usually an image too ' +
+          'large for the store. The change is live until you reload.', 'warn');
+      } else {
+        FS.toast(meta.label + ' saved', item.name, 'ok');
+      }
+
+      if (newSlug !== slug) {
+        slug = newSlug;
+        window.history.replaceState({}, '', FS.url('admin/catalog-edit.html?t=' + kind + '&s=' + newSlug));
+      }
+      render();
+    }
+  }
+
   /* ======================================================================
      Dispatch
      ====================================================================== */
@@ -2678,6 +3152,10 @@
     'blog': blog,
     'blog-edit': blogEdit,
     'service-areas': serviceAreas,
+    'services': catalogList,
+    'industries': catalogList,
+    'vehicles': catalogList,
+    'catalog-edit': catalogEdit,
     'users': users,
     'settings': settings
   };

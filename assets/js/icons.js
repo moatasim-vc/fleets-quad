@@ -132,6 +132,9 @@
       'stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">' + body + '</svg>';
   };
 
+  /** Every icon name in the registry, for the admin's icon pickers. */
+  FS.iconNames = function () { return Object.keys(PATHS).sort(); };
+
   /** Render N filled + (5-N) empty stars. */
   FS.stars = function (rating, cls) {
     var out = '<span class="stars ' + (cls || '') + '" role="img" aria-label="' + rating + ' out of 5">';
