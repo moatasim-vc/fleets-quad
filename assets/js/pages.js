@@ -37,7 +37,7 @@
           '<h2>Ready to put a tech on your fleet?</h2>' +
           '<p>Book service today and keep your fleet mission-ready. Free estimate, no obligation.</p>' +
           '<div class="row row-wrap" style="gap:var(--sp-3);margin-top:var(--sp-6)">' +
-            '<a class="btn btn-primary" href="' + FS.url('get-estimate.html') + '">Get Estimate</a>' +
+            '<a class="btn btn-primary" href="' + FS.url(FS.data.links.estimate) + '">Get Estimate</a>' +
             '<a class="btn btn-outline-light" href="tel:' + C.phoneRaw + '">' + FS.icon('phone') + C.phone + '</a>' +
           '</div>' +
         '</div>' +
@@ -330,7 +330,7 @@
 
     setHero(s.hero, s.intro.split('. ')[0] + '.',
       [{ label: 'Home', href: 'index.html' }, { label: 'Services', href: 'services.html' }, { label: s.short }],
-      '<a class="btn btn-primary" href="' + FS.url('get-estimate.html') + '">Get Estimate</a>');
+      '<a class="btn btn-primary" href="' + FS.url(FS.data.links.estimate) + '">Get Estimate</a>');
 
     body.innerHTML =
       section(
@@ -346,7 +346,7 @@
             '<div class="card mt-5"><div class="card-body">' +
               '<h4 class="mb-3">Book this service</h4>' +
               '<p class="text-muted text-sm mb-5">Tell us how many vehicles and where they are. We handle the rest.</p>' +
-              '<a class="btn btn-primary btn-block mb-3" href="' + FS.url('get-estimate.html') + '">Get Estimate</a>' +
+              '<a class="btn btn-primary btn-block mb-3" href="' + FS.url(FS.data.links.estimate) + '">Get Estimate</a>' +
               '<a class="btn btn-outline btn-block" href="tel:' + C.phoneRaw + '">' + FS.icon('phone') + C.phone + '</a>' +
             '</div></div>' +
           '</div>' +
@@ -398,7 +398,7 @@
 
     setHero(i.hero, i.intro,
       [{ label: 'Home', href: 'index.html' }, { label: 'Industries', href: 'industries.html' }, { label: i.name }],
-      '<a class="btn btn-primary" href="' + FS.url('get-estimate.html') + '">Get Estimate</a>');
+      '<a class="btn btn-primary" href="' + FS.url(FS.data.links.estimate) + '">Get Estimate</a>');
 
     body.innerHTML =
       section('<div class="grid grid-3">' + i.stats.map(function (s) {
@@ -417,7 +417,7 @@
                 'style="padding:11px 0;border-bottom:1px solid var(--line-soft);color:var(--ink-700)">' +
                 '<span class="text-semi">' + FS.esc(s.short) + '</span>' + FS.icon('chevron-right') + '</a>';
             }).join('') +
-            '<a class="btn btn-primary btn-block mt-5" href="' + FS.url('get-estimate.html') + '">Get Estimate</a>' +
+            '<a class="btn btn-primary btn-block mt-5" href="' + FS.url(FS.data.links.estimate) + '">Get Estimate</a>' +
           '</div></div>' +
         '</div>', '', 'padding-top:0') +
 
@@ -461,7 +461,7 @@
 
     setHero(v.hero, v.intro,
       [{ label: 'Home', href: 'index.html' }, { label: 'Vehicles', href: 'vehicles.html' }, { label: v.name }],
-      '<a class="btn btn-primary" href="' + FS.url('get-estimate.html') + '">Get Estimate</a>');
+      '<a class="btn btn-primary" href="' + FS.url(FS.data.links.estimate) + '">Get Estimate</a>');
 
     body.innerHTML =
       section(
@@ -783,7 +783,7 @@
               return '<div class="money-row"><span>' + FS.esc(s.label) + '</span>' +
                 '<strong>' + (s.decimal ? s.value : FS.num(s.value)) + s.suffix + '</strong></div>';
             }).join('') +
-            '<a class="btn btn-primary btn-block mt-5" href="' + FS.url('get-estimate.html') + '">Get Estimate</a>' +
+            '<a class="btn btn-primary btn-block mt-5" href="' + FS.url(FS.data.links.estimate) + '">Get Estimate</a>' +
           '</div></div>' +
         '</div>') +
 

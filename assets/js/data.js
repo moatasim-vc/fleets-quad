@@ -336,6 +336,12 @@
     ] }
   ];
 
+  /* Where the blue Get Estimate buttons go. The meta sheet puts this page at
+     /signup/, so that is the address every call-to-action uses. The older
+     get-estimate.html still serves the same page for anyone holding a link
+     to it, and both declare /signup/ as their canonical. */
+  D.links = { estimate: 'signup/' };
+
   /* ======================================================================
      Get Estimate form options
      ====================================================================== */

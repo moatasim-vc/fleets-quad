@@ -94,7 +94,7 @@
           '<a class="drawer-phone" href="tel:' + C.phoneRaw + '">' + FS.esc(C.phone) + '</a>' +
         '</div>' +
         '<div class="drawer-body">' +
-          '<a class="btn btn-primary btn-block btn-lg" href="' + FS.url('get-estimate.html') + '">Get Estimate</a>' +
+          '<a class="btn btn-primary btn-block btn-lg" href="' + FS.url(FS.data.links.estimate) + '">Get Estimate</a>' +
           '<div class="drawer-groups">' + groups + '</div>' +
         '</div>' +
         '<div class="drawer-foot">' +
