@@ -22,6 +22,9 @@
         { title: 'Operations', items: [
           { view: 'overview',      label: 'Dashboard',     icon: 'grid',        href: 'admin/index.html' },
           { view: 'orders',        label: 'Orders',        icon: 'list',        href: 'admin/orders.html', count: 'orders' },
+          // `alert` paints the count red — an unanswered customer message is
+          // not the same kind of number as a queue length.
+          { view: 'inbox',         label: 'Inbox',         icon: 'mail',        href: 'admin/inbox.html', count: 'messages', alert: true },
           { view: 'new-sale',      label: 'New Sale',      icon: 'plus',        href: 'admin/new-sale.html' }
         ] },
         { title: 'People', items: [
@@ -124,7 +127,8 @@
     return {
       orders: mine.filter(function (o) { return o.status !== 'completed' && o.status !== 'canceled'; }).length,
       unread: Store.unreadCount(role),
-      pendingReviews: Store.reviews('pending').length
+      pendingReviews: Store.reviews('pending').length,
+      messages: Store.inboxUnread()
     };
   }
 
@@ -136,8 +140,14 @@
     var groups = config.groups.map(function (g) {
       return '<div class="sidebar-section">' + FS.esc(g.title) + '</div>' +
         g.items.map(function (i) {
-          var pill = i.count && n[i.count] ? '<span class="count">' + n[i.count] + '</span>' : '';
-          return '<a class="sidebar-link' + (i.view === navView ? ' is-active' : '') + '" href="' + FS.url(i.href) + '">' +
+          /* The count key rides on the link so FS.refreshNavCounts() can put a
+             fresh number on it without rebuilding the whole sidebar. */
+          var attrs = i.count ? ' data-count-key="' + i.count + '"' + (i.alert ? ' data-count-alert="1"' : '') : '';
+          var pill = i.count && n[i.count]
+            ? '<span class="count' + (i.alert ? ' count--alert' : '') + '">' + n[i.count] + '</span>'
+            : '';
+          return '<a class="sidebar-link' + (i.view === navView ? ' is-active' : '') + '"' + attrs +
+            ' href="' + FS.url(i.href) + '">' +
             FS.icon(i.icon) + '<span>' + FS.esc(i.label) + '</span>' + pill + '</a>';
         }).join('');
     }).join('');
@@ -316,6 +326,25 @@
 
     FS.hydrateIcons(document);
   }
+
+  /**
+   * Put fresh numbers on the sidebar count pills. A screen that changes one of
+   * them — reading a message in the inbox, say — calls this so the badge does
+   * not sit there stale until the next page load.
+   */
+  FS.refreshNavCounts = function () {
+    var n = counts();
+    FS.$$('[data-count-key]').forEach(function (link) {
+      var value = n[link.dataset.countKey];
+      var pill = link.querySelector('.count');
+      if (!value) { if (pill) pill.remove(); return; }
+      if (!pill) {
+        pill = FS.el('span', { class: 'count' + (link.dataset.countAlert ? ' count--alert' : '') });
+        link.appendChild(pill);
+      }
+      pill.textContent = value;
+    });
+  };
 
   /* Expose the resolved session for the per-role page scripts. */
   FS.shell = { role: role, view: view, session: session, refId: refId, nav: NAV };

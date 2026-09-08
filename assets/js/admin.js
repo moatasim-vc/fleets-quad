@@ -9,6 +9,7 @@
 
   var FS = window.FS;
   var D = FS.data;
+  var C = D.company;
   var Store = FS.store;
   var Dash = FS.dash;
   var host = document.getElementById('dashBody');
@@ -1419,6 +1420,141 @@
   }
 
   /* ======================================================================
+     Inbox
+     What the public contact form collected. There is no mail server behind
+     the prototype, so the form files the message in this browser instead and
+     it is read here — newest at the top, unread highlighted, and the count in
+     the sidebar is the number still unanswered.
+     ====================================================================== */
+
+  function inbox() {
+    render();
+
+    function render() {
+      var list = Store.inbox();
+      var unread = Store.inboxUnread();
+
+      host.innerHTML =
+        '<div class="page-head"><div><h2>Inbox</h2>' +
+          '<p>Every message sent from the contact form on the website, newest first. ' +
+            'They are addressed to <strong>' + FS.esc(C.contactEmail) + '</strong> — ' +
+            'open one to read it in full and reply by email.</p></div>' +
+          '<div class="page-head-actions">' +
+            '<a class="btn btn-outline" href="' + FS.url('pages/contact.html') + '" target="_blank" rel="noopener">' +
+              FS.icon('external') + 'Contact page</a>' +
+            '<button class="btn btn-primary" id="ibReadAll"' + (unread ? '' : ' disabled') + '>' +
+              FS.icon('check') + 'Mark all read</button>' +
+          '</div>' +
+        '</div>' +
+
+        '<div class="card"><div class="card-head">' +
+          '<h3>Messages ' +
+            (unread ? '<span class="badge badge--danger">' + unread + ' unread</span>' : '') + '</h3>' +
+          '<span class="text-sm text-muted">' + list.length + ' total</span></div>' +
+          (list.length
+            ? list.map(row).join('')
+            : '<div class="empty-state">' + FS.icon('mail') +
+              '<h4>No messages yet</h4><p>Anything sent from the contact form lands here.</p></div>') +
+        '</div>';
+
+      /* The whole row opens the message; the buttons inside it stop the click
+         so they do not open it as well. */
+      FS.$$('[data-ibopen]', host).forEach(function (el) {
+        el.addEventListener('click', function () { openMessage(el.dataset.ibopen); });
+      });
+
+      FS.$$('[data-ibtoggle]', host).forEach(function (b) {
+        b.addEventListener('click', function (e) {
+          e.stopPropagation();
+          var m = Store.inboxMessage(b.dataset.ibtoggle);
+          Store.markMessageRead(m.id, !m.read);
+          render();
+        });
+      });
+
+      FS.$$('[data-ibdel]', host).forEach(function (b) {
+        b.addEventListener('click', function (e) {
+          e.stopPropagation();
+          var m = Store.inboxMessage(b.dataset.ibdel);
+          FS.confirm('Delete this message?',
+            'The message from ' + m.name + ' is removed from the inbox. This cannot be undone.',
+            function () {
+              Store.deleteMessage(m.id);
+              FS.toast('Message deleted', m.name, 'ok');
+              render();
+            }, true);
+        });
+      });
+
+      document.getElementById('ibReadAll').addEventListener('click', function () {
+        Store.markAllMessagesRead();
+        FS.toast('Inbox cleared', 'Every message is marked read.', 'ok');
+        render();
+      });
+
+      // The sidebar pill is the same unread number, so keep the two in step.
+      FS.refreshNavCounts();
+      FS.hydrateIcons(host);
+    }
+
+    /** One row in the list. The body is trimmed to a single teaser line. */
+    function row(m) {
+      var teaser = String(m.message || '').replace(/\s+/g, ' ');
+      if (teaser.length > 150) teaser = teaser.slice(0, 149).replace(/\s\S*$/, '') + '…';
+
+      return '<div class="note-item' + (m.read ? '' : ' is-unread') + '" ' +
+          'data-ibopen="' + FS.esc(m.id) + '" style="cursor:pointer">' +
+        '<span class="note-channel note-channel--email">' + FS.icon('mail') + '</span>' +
+        '<div class="note-body">' +
+          '<strong>' + FS.esc(m.name) + ' · ' + FS.esc(m.company || '—') + '</strong>' +
+          '<p>' + FS.esc(teaser) + '</p>' +
+          '<small class="text-xs text-dim">' + FS.esc(m.topic || 'General') + ' · ' +
+            FS.esc(m.email) + (m.phone ? ' · ' + FS.esc(m.phone) : '') + '</small>' +
+        '</div>' +
+        '<div class="stack" style="gap:6px;align-items:flex-end">' +
+          '<span class="note-time">' + FS.ago(m.at) + '</span>' +
+          '<span class="row" style="gap:4px">' +
+            '<button class="btn btn-xs btn-outline" data-ibtoggle="' + FS.esc(m.id) + '">' +
+              (m.read ? 'Mark unread' : 'Mark read') + '</button>' +
+            '<button class="btn btn-xs btn-danger" data-ibdel="' + FS.esc(m.id) + '" ' +
+              'aria-label="Delete message">' + FS.icon('trash') + '</button>' +
+          '</span>' +
+        '</div>' +
+      '</div>';
+    }
+
+    /** Read one in full. Opening it counts as reading it. */
+    function openMessage(id) {
+      var m = Store.inboxMessage(id);
+      if (!m) return;
+      Store.markMessageRead(m.id);
+
+      var subject = 'Re: ' + (m.topic || 'Your message') + ' — ' + (m.company || m.name);
+      FS.modal({
+        title: m.name,
+        subtitle: (m.company ? m.company + ' · ' : '') + FS.date(m.at),
+        size: 'lg',
+        body:
+          '<dl class="dl dl--2 mb-5">' +
+            '<div><dt>Email</dt><dd><a href="mailto:' + FS.esc(m.email) + '">' + FS.esc(m.email) + '</a></dd></div>' +
+            '<div><dt>Phone</dt><dd>' + (m.phone
+              ? '<a href="tel:' + FS.esc(m.phone) + '">' + FS.esc(m.phone) + '</a>' : '—') + '</dd></div>' +
+            '<div><dt>Topic</dt><dd>' + FS.esc(m.topic || 'General') + '</dd></div>' +
+            '<div><dt>Sent to</dt><dd>' + FS.esc(m.to || C.contactEmail) + '</dd></div>' +
+          '</dl>' +
+          '<h4 class="mb-2">Message</h4>' +
+          '<p class="prose" style="white-space:pre-line">' + FS.esc(m.message) + '</p>',
+        footer:
+          '<button class="btn btn-outline" data-close>Close</button>' +
+          '<a class="btn btn-primary" href="mailto:' + FS.esc(m.email) +
+            '?subject=' + encodeURIComponent(subject) + '">' + FS.icon('mail') + 'Reply by email</a>'
+      });
+      // The row behind the dialog is no longer unread, and nor is the sidebar.
+      render();
+    }
+  }
+
+  /* ======================================================================
      CMS pages
      ====================================================================== */
 
@@ -1430,12 +1566,16 @@
     function note(text) { return '<br><small class="text-xs text-dim">' + text + '</small>'; }
 
     function render() {
-      var pages = Store.cmsPages();
+      /* The homepage leads the list. A state saved by an earlier build picked
+         it up as an addition, so it would otherwise sit at the bottom. */
+      var pages = Store.cmsPages().slice().sort(function (a, b) {
+        return (b.slug === 'home') - (a.slug === 'home');
+      });
 
       host.innerHTML =
         '<div class="page-head"><div><h2>CMS Pages</h2>' +
           '<p>The heading, standfirst and search-engine record for every inner page reachable from the nav bar — ' +
-            'and the body copy on About, Contact, Privacy and Terms. ' +
+            'the body copy on About, Contact, Privacy and Terms, and the search-engine record for the homepage. ' +
             'Edits show on the live page straight away.</p></div>' +
           '<div class="page-head-actions">' +
             '<a class="btn btn-outline" href="' + FS.url('admin/blog.html') + '">' + FS.icon('edit') + 'Blog</a>' +
@@ -1461,8 +1601,13 @@
                   : Store.hasBlocks(p.slug)
                     ? note(plural(Store.cmsBlocks(p.slug).length, 'section') +
                         (p.mapAddress || p.mapEmbed ? ' · map' : ''))
+                  // Home is listed for its meta only — say so, so nobody opens
+                  // it looking for the hero copy.
+                  : p.metaOnly
+                    ? note('Search engine listing only')
                   : '') + '</td>' +
-              '<td data-label="Address"><code class="text-sm text-dim">/' + FS.esc(p.slug) + '</code></td>' +
+              '<td data-label="Address"><code class="text-sm text-dim">' +
+                FS.esc(p.address || '/' + p.slug) + '</code></td>' +
               '<td data-label="Meta title"><span class="text-sm">' + FS.esc(p.metaTitle || '—') + '</span><br>' +
                 '<small class="text-xs ' + (seoOk ? 'text-ok' : 'text-dim') + '">' +
                 'Title ' + titleLen + '/60 · Description ' + descLen + '/160</small></td>' +
@@ -1470,7 +1615,7 @@
               '<td data-label="Status"><span class="badge badge--' + (p.status === 'published' ? 'ok' : 'warn') + '">' +
                 FS.esc(p.status) + '</span></td>' +
               '<td class="td-actions" data-label="Actions">' +
-                '<a class="btn btn-xs btn-outline" href="' + FS.url('pages/' + p.slug + '.html') + '" target="_blank" rel="noopener">' +
+                '<a class="btn btn-xs btn-outline" href="' + FS.url(p.url || 'pages/' + p.slug + '.html') + '" target="_blank" rel="noopener">' +
                   FS.icon('external') + 'View</a> ' +
                 '<button class="btn btn-xs btn-primary" data-cms="' + p.slug + '">' + FS.icon('edit') + 'Edit</button>' +
               '</td></tr>';
@@ -1503,6 +1648,10 @@
       var isPartners = p.slug === 'partners';
       var isFaqs = p.slug === 'faqs';
       var isContact = p.slug === 'contact';
+      /* Home is here for its search-engine listing alone: its heading and copy
+         are the hero markup and the blocks drawn from services, reviews and
+         the blog, none of which this dialog owns. */
+      var metaOnly = !!p.metaOnly;
       /* About, Contact, Privacy and Terms carry their body copy as a list of
          sections rather than markup, so the whole page is editable here. */
       var hasBlocks = Store.hasBlocks(p.slug);
@@ -1518,15 +1667,21 @@
 
       FS.modal({
         title: 'Edit: ' + p.title,
-        subtitle: '/' + p.slug,
+        subtitle: p.address || '/' + p.slug,
         size: 'lg',
         body: '<form id="cmsForm">' +
-          '<div class="field"><label class="label" for="cmName">Name in the admin</label>' +
-            '<input class="input" id="cmName" name="title" value="' + FS.esc(p.title) + '"></div>' +
-          '<div class="field"><label class="label" for="cmHeading">Page heading (H1)</label>' +
-            '<input class="input" id="cmHeading" name="heading" value="' + FS.esc(p.heading || '') + '"></div>' +
-          '<div class="field"><label class="label" for="cmLead">Standfirst under the heading</label>' +
-            '<textarea class="textarea" id="cmLead" name="lead" style="min-height:70px">' + FS.esc(p.lead || '') + '</textarea></div>' +
+          (metaOnly
+            ? '<p class="text-muted text-sm mb-5">This is the title, description and ' +
+                'keywords the homepage gives Google and the social cards. The copy on ' +
+                'the page itself is edited where that content lives — services under ' +
+                'Services, the reviews strip under Reviews, the articles under Blog.</p>'
+            : '<div class="field"><label class="label" for="cmName">Name in the admin</label>' +
+                '<input class="input" id="cmName" name="title" value="' + FS.esc(p.title) + '"></div>' +
+              '<div class="field"><label class="label" for="cmHeading">Page heading (H1)</label>' +
+                '<input class="input" id="cmHeading" name="heading" value="' + FS.esc(p.heading || '') + '"></div>' +
+              '<div class="field"><label class="label" for="cmLead">Standfirst under the heading</label>' +
+                '<textarea class="textarea" id="cmLead" name="lead" style="min-height:70px">' +
+                FS.esc(p.lead || '') + '</textarea></div>') +
 
           (hasBlocks
             ? '<div class="divider"></div>' +
@@ -1575,11 +1730,14 @@
           '<div class="field"><label class="label" for="cmKeywords">Keywords</label>' +
             '<input class="input" id="cmKeywords" name="keywords" value="' + FS.esc(p.keywords || '') + '">' +
             '<p class="hint">Comma separated.</p></div>' +
-          '<div class="field"><label class="label" for="cmStatus">Status</label>' +
-            '<select class="select" id="cmStatus" name="status">' +
-              '<option value="published"' + (p.status === 'published' ? ' selected' : '') + '>published</option>' +
-              '<option value="draft"' + (p.status === 'draft' ? ' selected' : '') + '>draft</option>' +
-            '</select></div>' +
+          // No status on the homepage — it cannot be taken off the site.
+          (metaOnly
+            ? ''
+            : '<div class="field"><label class="label" for="cmStatus">Status</label>' +
+                '<select class="select" id="cmStatus" name="status">' +
+                  '<option value="published"' + (p.status === 'published' ? ' selected' : '') + '>published</option>' +
+                  '<option value="draft"' + (p.status === 'draft' ? ' selected' : '') + '>draft</option>' +
+                '</select></div>') +
           (isPartners
             ? '<div class="divider"></div>' +
               '<div class="row-between mb-3">' +
@@ -2682,6 +2840,9 @@
     function render() {
       var items = Store.catalog(kind);
       var plural = meta.label + (meta.label.slice(-1) === 'y' ? '' : 's');
+      /* Services have no picture of their own in this list, so the name
+         column stands alone there. The other catalogs keep their thumbnail. */
+      var showThumb = kind !== 'service';
       if (meta.label.slice(-1) === 'y') plural = meta.label.slice(0, -1) + 'ies';
 
       host.innerHTML =
@@ -2712,9 +2873,11 @@
                 '</div></td>' +
                 '<td data-label="' + FS.esc(meta.label) + '" class="td-strong">' +
                   '<div class="row" style="gap:10px">' +
-                    (it.image
-                      ? '<span class="cat-thumb"><img src="' + FS.esc(FS.url(it.image)) + '" alt=""></span>'
-                      : '<span class="cat-thumb">' + FS.icon(it.icon || 'truck-wrench') + '</span>') +
+                    (showThumb
+                      ? (it.image
+                        ? '<span class="cat-thumb"><img src="' + FS.esc(FS.url(it.image)) + '" alt=""></span>'
+                        : '<span class="cat-thumb">' + FS.icon(it.icon || 'truck-wrench') + '</span>')
+                      : '') +
                     '<span><strong>' + FS.esc(it.name) + '</strong>' +
                     '<br><small class="text-xs text-dim">' +
                       (it.bullets || []).length + ' bullets · ' +
@@ -2782,6 +2945,8 @@
     var meta = Store.catalogMeta[kind];
     var slug = FS.param('s');
     var item = meta && Store.catalogItem(kind, slug);
+    /* Only vehicle types render a picture anywhere on the site. */
+    var hasPicture = kind === 'vehicle';
 
     if (!item) {
       host.innerHTML = '<div class="empty-state">' + FS.icon('help-circle') +
@@ -2868,24 +3033,31 @@
 
           '<div>' +
             /* --- Picture / icon --------------------------------------- */
-            '<div class="card mb-5"><div class="card-head"><h3>Picture</h3></div><div class="card-body">' +
-              '<div class="field"><span class="label">Image</span>' +
-                '<div class="img-picker">' +
-                  '<span class="img-preview" id="ceImgPreview">' +
-                    (item.image ? '<img src="' + FS.esc(FS.url(item.image)) + '" alt="">' : FS.icon('image')) +
-                  '</span>' +
-                  '<div class="img-picker-tools">' +
-                    '<label class="btn btn-sm btn-outline btn-file">' + FS.icon('upload') + 'Upload' +
-                      '<input type="file" accept="image/*" id="ceImgFile"></label>' +
-                  '</div>' +
-                '</div>' +
-                '<input type="hidden" id="ceImage" name="image" value="' + FS.esc(item.image || '') + '">' +
-                '<div class="field mt-4 mb-0"><label class="label" for="ceImgUrl">Or paste an address</label>' +
-                  '<input class="input" id="ceImgUrl" ' +
-                  'value="' + FS.esc(/^data:/.test(item.image || '') ? '' : (item.image || '')) + '" ' +
-                  'placeholder="assets/img/services/example.jpg"></div>' +
-                '<p class="hint" id="ceImgHint">Any size — it is resized on upload and cropped to fit.</p>' +
-              '</div>' +
+            /* The picture control is for vehicle types only. Their artwork is
+               the design on the homepage row and the vehicles index, so it has
+               to be manageable. Services no longer show a picture on their own
+               page, and industries never had one, so neither offers the field. */
+            '<div class="card mb-5"><div class="card-head"><h3>' +
+              (hasPicture ? 'Picture and icon' : 'Icon') + '</h3></div><div class="card-body">' +
+              (hasPicture
+                ? '<div class="field"><span class="label">Image</span>' +
+                    '<div class="img-picker">' +
+                      '<span class="img-preview" id="ceImgPreview">' +
+                        (item.image ? '<img src="' + FS.esc(FS.url(item.image)) + '" alt="">' : FS.icon('image')) +
+                      '</span>' +
+                      '<div class="img-picker-tools">' +
+                        '<label class="btn btn-sm btn-outline btn-file">' + FS.icon('upload') + 'Upload' +
+                          '<input type="file" accept="image/*" id="ceImgFile"></label>' +
+                      '</div>' +
+                    '</div>' +
+                    '<input type="hidden" id="ceImage" name="image" value="' + FS.esc(item.image || '') + '">' +
+                    '<div class="field mt-4 mb-0"><label class="label" for="ceImgUrl">Or paste an address</label>' +
+                      '<input class="input" id="ceImgUrl" ' +
+                      'value="' + FS.esc(/^data:/.test(item.image || '') ? '' : (item.image || '')) + '" ' +
+                      'placeholder="assets/img/vehicles/example.png"></div>' +
+                    '<p class="hint" id="ceImgHint">Any size — it is resized on upload and cropped to fit.</p>' +
+                  '</div>'
+                : '') +
               '<div class="field mb-0"><label class="label" for="ceIcon">Icon</label>' +
                 '<select class="select" id="ceIcon" name="icon">' +
                   FS.iconNames().map(function (n) {
@@ -3042,26 +3214,28 @@
       iconSel.addEventListener('change', paintIcon);
       paintIcon();
 
-      /* Picture */
-      var image = document.getElementById('ceImage');
-      var preview = document.getElementById('ceImgPreview');
-      var urlField = document.getElementById('ceImgUrl');
-      function setImage(v, note) {
-        image.value = v || '';
-        preview.innerHTML = v ? '<img src="' + FS.esc(FS.url(v)) + '" alt="">' : FS.icon('image');
-        FS.hydrateIcons(preview);
-        if (note) document.getElementById('ceImgHint').textContent = note;
-      }
-      document.getElementById('ceImgFile').addEventListener('change', function () {
-        var file = this.files[0];
-        if (!file) return;
-        FS.readImage(file, 1400, function (url, err, info) {
-          if (err) { FS.toast('Could not use that file', err, 'warn'); return; }
-          setImage(url, info.width + '×' + info.height + ' · about ' + Math.round(info.bytes / 1024) + ' KB.');
-          urlField.value = '';
+      /* Picture — vehicle types only; the other two catalogs have no field. */
+      if (hasPicture) {
+        var image = document.getElementById('ceImage');
+        var preview = document.getElementById('ceImgPreview');
+        var urlField = document.getElementById('ceImgUrl');
+        var setImage = function (v, note) {
+          image.value = v || '';
+          preview.innerHTML = v ? '<img src="' + FS.esc(FS.url(v)) + '" alt="">' : FS.icon('image');
+          FS.hydrateIcons(preview);
+          if (note) document.getElementById('ceImgHint').textContent = note;
+        };
+        document.getElementById('ceImgFile').addEventListener('change', function () {
+          var file = this.files[0];
+          if (!file) return;
+          FS.readImage(file, 1400, function (url, err, info) {
+            if (err) { FS.toast('Could not use that file', err, 'warn'); return; }
+            setImage(url, info.width + '×' + info.height + ' · about ' + Math.round(info.bytes / 1024) + ' KB.');
+            urlField.value = '';
+          });
         });
-      });
-      urlField.addEventListener('input', function () { setImage(this.value.trim(), 'Loaded from an address.'); });
+        urlField.addEventListener('input', function () { setImage(this.value.trim(), 'Loaded from an address.'); });
+      }
 
       document.getElementById('ceAddBullet').addEventListener('click', function () {
         collectBullets();
@@ -3098,7 +3272,9 @@
         name: form.name,
         short: form.short || form.name,
         icon: form.icon,
-        image: form.image,
+        // Without a picture control on the form there is no value to read, so
+        // whatever the record already holds is carried through untouched.
+        image: hasPicture ? form.image : item.image,
         excerpt: form.excerpt,
         hero: form.hero || form.name,
         intro: form.intro,
@@ -3148,6 +3324,7 @@
     'payments': payments,
     'reviews': reviews,
     'notifications': notifications,
+    'inbox': inbox,
     'cms': cms,
     'blog': blog,
     'blog-edit': blogEdit,

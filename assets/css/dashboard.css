@@ -94,6 +94,10 @@ body.sidebar-open .sidebar-scrim { opacity: 1; visibility: visible; }
   font-weight: 700;
 }
 .sidebar-link.is-active .count { background: rgba(255, 255, 255, .26); }
+/* Unanswered customer messages. Red on the navy sidebar, and red again when
+   the link itself is active, where the translucent pill would disappear. */
+.sidebar-link .count--alert,
+.sidebar-link.is-active .count--alert { background: var(--danger); color: #fff; }
 
 .sidebar-foot { flex: none; padding: var(--sp-4); border-top: 1px solid rgba(255, 255, 255, .1); }
 

@@ -166,6 +166,92 @@
   }
 
   /* ------------------------------------------------------------------------
+     Search-engine record
+     Lives here rather than in pages.js because the homepage loads site.js but
+     not pages.js, and its meta is editable in Admin → CMS Pages like the rest.
+     ------------------------------------------------------------------------ */
+  /**
+   * Write the SEO record for a page that is assembled at runtime. Static pages
+   * carry their own tags in the markup; templated ones set them here so the
+   * title, description, keywords, canonical and the social card all agree.
+   * @param {{title:string, description:string, keywords?:string,
+   *          path?:string, image?:string, type?:string}} seo
+   * @returns {boolean} whether a title was written — the caller can then skip
+   *   its own fallback title.
+   */
+  function setSeo(seo) {
+    var titled = false;
+    if (seo.title) { document.title = seo.title; titled = true; }
+    meta('name', 'description', seo.description);
+    if (seo.keywords) meta('name', 'keywords', seo.keywords);
+
+    var url = 'https://www.fleetsquad.com/' + String(seo.path || '').replace(/^\//, '');
+    link('canonical', url);
+
+    meta('property', 'og:title', seo.title);
+    meta('property', 'og:description', seo.description);
+    meta('property', 'og:type', seo.type || 'website');
+    meta('property', 'og:url', url);
+    meta('property', 'og:site_name', 'FleetSquad');
+    meta('name', 'twitter:card', 'summary_large_image');
+    meta('name', 'twitter:title', seo.title);
+    meta('name', 'twitter:description', seo.description);
+    // An image an admin uploaded is a data: URL held in this browser. It shows
+    // on the page, but a share card has to point at something fetchable, so it
+    // is left off rather than published as a broken address.
+    if (seo.image && !/^data:/.test(seo.image)) {
+      var img = /^https?:/.test(seo.image)
+        ? seo.image
+        : 'https://www.fleetsquad.com/' + seo.image.replace(/^\//, '');
+      meta('property', 'og:image', img);
+      meta('name', 'twitter:image', img);
+    }
+    return titled;
+
+    function meta(attr, key, value) {
+      if (!value) return;
+      var node = document.head.querySelector('meta[' + attr + '="' + key + '"]');
+      if (!node) {
+        node = document.createElement('meta');
+        node.setAttribute(attr, key);
+        document.head.appendChild(node);
+      }
+      node.setAttribute('content', value);
+    }
+    function link(rel, href) {
+      var node = document.head.querySelector('link[rel="' + rel + '"]');
+      if (!node) {
+        node = document.createElement('link');
+        node.setAttribute('rel', rel);
+        document.head.appendChild(node);
+      }
+      node.setAttribute('href', href);
+    }
+  }
+  FS.setSeo = setSeo;
+
+  /**
+   * Apply the meta record an admin saved for one of the fixed pages, if there
+   * is one. The markup already ships a sensible record, so this only matters
+   * once the page has been edited in Admin → CMS Pages.
+   * @param {string} slug matches D.cmsPages
+   * @returns {object|null} the page record
+   */
+  function applyCmsSeo(slug) {
+    var page = FS.store && FS.store.cmsPage(slug);
+    if (!page) return null;
+    setSeo({
+      title: page.metaTitle || (page.title + ' | FleetSquad'),
+      description: page.metaDescription || page.lead || '',
+      keywords: page.keywords,
+      path: page.path !== undefined ? page.path : slug,
+      image: page.image
+    });
+    return page;
+  }
+  FS.applyCmsSeo = applyCmsSeo;
+
+  /* ------------------------------------------------------------------------
      Mount + behaviour
      ------------------------------------------------------------------------ */
   function mount() {

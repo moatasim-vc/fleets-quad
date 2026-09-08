@@ -868,6 +868,33 @@ body.drawer-open .drawer { transform: translateX(0); }
 .tile-link { display: inline-flex; align-items: center; gap: 7px; color: var(--blue-600); font-weight: 600; font-size: var(--fs-base); }
 .tile-link svg { width: 16px; height: 16px; }
 
+/* Figure list — the "by the numbers" card on About. Label on the left, value
+   hard against the right edge, both sitting on one baseline. The dashboard
+   sheet does this same job with .money-row, but dashboard.css is not loaded
+   out here on the public side, so these rows carry their own rule. */
+.figure-list { display: grid; margin-bottom: var(--sp-6); }
+.figure-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--sp-5);
+  padding: 13px 0;
+}
+.figure-row:first-child { padding-top: 0; }
+.figure-row + .figure-row { border-top: 1px dashed var(--line); }
+.figure-row > span { color: var(--ink-500); font-size: var(--fs-base); font-weight: 600; line-height: 1.35; }
+/* Tabular figures line 10,000 and 250,000 up digit for digit down the column,
+   and nowrap keeps a long label from pushing its number onto a line of its own. */
+.figure-row > strong {
+  flex: none;
+  color: var(--navy-800);
+  font-size: var(--fs-xl);
+  font-weight: 800;
+  line-height: 1.2;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
 /* --------------------------------------------------------------------------
    Reviews / testimonials
    -------------------------------------------------------------------------- */
@@ -988,7 +1015,6 @@ body.drawer-open .drawer { transform: translateX(0); }
 .voice-pill:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
 .voice-pill.is-active { background: #fff; color: var(--navy-800); border-color: #fff; }
 .voice-pill svg { width: 16px; height: 16px; }
-.voice-pill--stop { padding: 6px 10px; }
 
 /* --------------------------------------------------------------------------
    FAQ accordion

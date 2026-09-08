@@ -44,6 +44,7 @@
       industries:    clone(FS.data.industries),
       vehicleTypes:  clone(FS.data.vehicleTypes),
       faqs:          clone(FS.data.faqs),
+      inbox:         clone(FS.data.inbox),
       credentials:   credentials,
       settings:      { stripe: {}, stripeMode: 'test', stripeConnected: false },
       estimates:     [],
@@ -51,6 +52,7 @@
       impersonator:  null,
       nextProject:   1233,
       nextCustomer:  1009,
+      nextMessage:   1005,
       seedVersion:   SEED_VERSION
     };
   }
@@ -58,7 +60,7 @@
   /* Bumped when the shipped data changes in a way a saved state must pick up.
      Anything not listed in migrate() below is left exactly as the user left
      it — this is deliberately narrow, not a reset. */
-  var SEED_VERSION = 2;
+  var SEED_VERSION = 3;
 
   /**
    * Fold new shipped data into a state that was saved by an earlier build.
@@ -73,14 +75,25 @@
 
     // v2: the client supplied their SEO sheet. Take the meta record for every
     // CMS page from it, but leave headings, body copy and status alone — those
-    // are the admin's, the meta is the sheet's.
+    // are the admin's, the meta is the sheet's. Only for a state that predates
+    // the sheet; re-running it later would undo the admin's own meta edits.
+    if (!(was >= 2)) {
+      fresh.cmsPages.forEach(function (f) {
+        var mine = saved.cmsPages.filter(function (p) { return p.slug === f.slug; })[0];
+        if (!mine) { saved.cmsPages.push(f); return; }
+        mine.metaTitle = f.metaTitle;
+        mine.metaDescription = f.metaDescription;
+        mine.keywords = f.keywords;
+        mine.path = f.path;
+      });
+    }
+
+    // v3: the homepage joined the CMS page list so its meta record is editable
+    // too. Add any page this build ships that the saved state has never seen;
+    // a page already there keeps whatever the admin made of it.
     fresh.cmsPages.forEach(function (f) {
       var mine = saved.cmsPages.filter(function (p) { return p.slug === f.slug; })[0];
-      if (!mine) { saved.cmsPages.push(f); return; }
-      mine.metaTitle = f.metaTitle;
-      mine.metaDescription = f.metaDescription;
-      mine.keywords = f.keywords;
-      mine.path = f.path;
+      if (!mine) saved.cmsPages.push(f);
     });
 
     saved.seedVersion = SEED_VERSION;
@@ -937,6 +950,67 @@
       state.notifications.forEach(function (n) {
         if (!audience || n.audience === audience) n.read = true;
       });
+      persist();
+    },
+
+    /* ----------------------------------------------------------------------
+       Contact inbox
+       What the public contact form collects. Nothing is posted anywhere —
+       there is no mail server behind this prototype — so a message is filed
+       in this browser and read in Admin → Inbox, addressed to the support
+       desk in FS.data.company.contactEmail.
+       ---------------------------------------------------------------------- */
+
+    /** Every message, newest first. */
+    inbox: function () {
+      return state.inbox.slice().sort(function (a, b) {
+        return new Date(b.at) - new Date(a.at);
+      });
+    },
+
+    inboxMessage: function (id) {
+      return state.inbox.filter(function (m) { return m.id === id; })[0] || null;
+    },
+
+    /** How many are still unread — the red count in the sidebar. */
+    inboxUnread: function () {
+      return state.inbox.filter(function (m) { return !m.read; }).length;
+    },
+
+    /**
+     * File a message from the contact form.
+     * @param {{name:string, company:string, email:string, phone:string,
+     *          topic:string, message:string}} payload
+     * @returns {object} the stored record
+     */
+    addMessage: function (payload) {
+      var msg = Object.assign({
+        id: 'MSG-' + state.nextMessage++,
+        at: new Date().toISOString(),
+        to: FS.data.company.contactEmail,
+        read: false
+      }, payload);
+      state.inbox.unshift(msg);
+      Store.lastWriteOk = persist();
+      return msg;
+    },
+
+    /** Flip one message's read flag. Pass `false` to mark it unread again. */
+    markMessageRead: function (id, read) {
+      var m = Store.inboxMessage(id);
+      if (!m) return null;
+      m.read = read !== false;
+      persist();
+      return m;
+    },
+
+    markAllMessagesRead: function () {
+      state.inbox.forEach(function (m) { m.read = true; });
+      persist();
+    },
+
+    deleteMessage: function (id) {
+      state.inbox = state.inbox.filter(function (m) { return m.id !== id; });
       persist();
     },
 

@@ -250,8 +250,18 @@
     });
   }
 
+  /* ------------------------------------------------------------------------
+     Search-engine record
+     index.html ships the meta sheet's record in its <head>. Admin → CMS Pages
+     → Home writes over it here, so an edit shows without touching the markup.
+     ------------------------------------------------------------------------ */
+  function applySeo() {
+    FS.applyCmsSeo('home');
+  }
+
   /* ------------------------------------------------------------------------ */
   function init() {
+    applySeo();
     renderStats();
     renderBrands();
     renderServices();

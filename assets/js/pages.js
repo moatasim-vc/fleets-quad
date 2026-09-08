@@ -29,7 +29,8 @@
       (lead ? '<p>' + FS.esc(lead) + '</p>' : '') + '</div>';
   }
 
-  /** Closing call-to-action + contact strip shared by every SEO template. */
+  /* Closing call-to-action shared by every SEO template. The three contact
+     cards that used to sit under it were removed at the client's request. */
   function ctaBlock() {
     return '<section class="section" style="padding-top:0"><div class="container">' +
       '<div class="cta-band">' +
@@ -44,15 +45,6 @@
         '<div class="cta-photo"><img src="' + FS.url('assets/img/cta-van.jpg') + '" alt="" loading="lazy"></div>' +
       '</div>' +
     '</div></section>';
-  }
-
-  function contactBlock() {
-    return section(
-      '<div class="grid grid-3">' +
-        contactCard('phone-ring', 'Call dispatch', C.phone, '', C.hours) +
-        contactCard('mail', 'Email us', C.email, '', 'We reply within one business hour') +
-        contactCard('globe', 'Coverage', C.network, '', '16 states · 80+ metro areas') +
-      '</div>', '', 'padding-top:0');
   }
 
   function contactCard(icon, label, value, href, sub) {
@@ -79,14 +71,20 @@
     }).join('') + '</ul></div>';
   }
 
+  /* Whether a search-engine record has already been written on this page, so
+     setHero() knows not to fall back to the on-page headline. */
+  var seoApplied = false;
+
   /**
-   * Write the SEO record for a page that is assembled at runtime. Static pages
-   * carry their own tags in the markup; templated ones set them here so the
-   * title, description, keywords, canonical and the social card all agree.
+   * Write the SEO record for this page. The writer itself lives in site.js —
+   * the homepage needs it and does not load this file — so this only keeps
+   * track of whether it ran.
    * @param {{title:string, description:string, keywords?:string,
    *          path?:string, image?:string, type?:string}} seo
    */
-  var seoApplied = false;
+  function setSeo(seo) {
+    if (FS.setSeo(seo)) seoApplied = true;
+  }
 
   /**
    * The client's meta sheet entry for a page, if it has one.
@@ -130,55 +128,6 @@
     return FS.param(key) || document.body.dataset.slug || '';
   }
 
-  function setSeo(seo) {
-    if (seo.title) { document.title = seo.title; seoApplied = true; }
-    meta('name', 'description', seo.description);
-    if (seo.keywords) meta('name', 'keywords', seo.keywords);
-
-    var url = 'https://www.fleetsquad.com/' + String(seo.path || '').replace(/^\//, '');
-    link('canonical', url);
-
-    meta('property', 'og:title', seo.title);
-    meta('property', 'og:description', seo.description);
-    meta('property', 'og:type', seo.type || 'website');
-    meta('property', 'og:url', url);
-    meta('property', 'og:site_name', 'FleetSquad');
-    meta('name', 'twitter:card', 'summary_large_image');
-    meta('name', 'twitter:title', seo.title);
-    meta('name', 'twitter:description', seo.description);
-    // An image an admin uploaded is a data: URL held in this browser. It shows
-    // on the page, but a share card has to point at something fetchable, so it
-    // is left off rather than published as a broken address.
-    if (seo.image && !/^data:/.test(seo.image)) {
-      var img = /^https?:/.test(seo.image)
-        ? seo.image
-        : 'https://www.fleetsquad.com/' + seo.image.replace(/^\//, '');
-      meta('property', 'og:image', img);
-      meta('name', 'twitter:image', img);
-    }
-
-    function meta(attr, key, value) {
-      if (!value) return;
-      var node = document.head.querySelector('meta[' + attr + '="' + key + '"]');
-      if (!node) {
-        node = document.createElement('meta');
-        node.setAttribute(attr, key);
-        document.head.appendChild(node);
-      }
-      node.setAttribute('content', value);
-    }
-    function link(rel, href) {
-      var node = document.head.querySelector('link[rel="' + rel + '"]');
-      if (!node) {
-        node = document.createElement('link');
-        node.setAttribute('rel', rel);
-        document.head.appendChild(node);
-      }
-      node.setAttribute('href', href);
-    }
-  }
-  FS.setSeo = setSeo;
-
   /**
    * Apply the CMS record for one of the fixed inner pages. The markup already
    * carries a sensible heading, lead and meta description, so this only
@@ -186,22 +135,17 @@
    * @param {string} slug matches D.cmsPages
    */
   function applyCmsPage(slug) {
-    var page = Store.cmsPage(slug);
+    // metaTitle / metaDescription / keywords are seeded from the meta sheet
+    // and are editable in Admin -> CMS Pages, so whatever is saved wins here.
+    // The writer is shared with the homepage, which lives in site.js.
+    var page = FS.applyCmsSeo(slug);
     if (!page) return null;
+    seoApplied = true;
 
     var h1 = document.getElementById('pageTitle');
     var lead = document.getElementById('pageLead');
     if (h1 && page.heading) h1.textContent = page.heading;
     if (lead && page.lead) lead.textContent = page.lead;
-
-    // metaTitle / metaDescription / keywords are seeded from the meta sheet
-    // and are editable in Admin -> CMS Pages, so whatever is saved wins here.
-    setSeo({
-      title: page.metaTitle || (page.title + ' | FleetSquad'),
-      description: page.metaDescription || page.lead || '',
-      keywords: page.keywords,
-      path: page.path || slug
-    });
     return page;
   }
 
@@ -312,7 +256,7 @@
           FS.icon('chevron-right', 'svc-chevron') +
         '</a>';
       }).join('') + '</div>') +
-      ctaBlock() + contactBlock();
+      ctaBlock();
     // Force the desktop card treatment on the index even on narrow screens.
     FS.$$('.svc-card', body).forEach(function (c) { c.classList.add('svc-card--full'); });
   }
@@ -333,23 +277,16 @@
       '<a class="btn btn-primary" href="' + FS.url(FS.data.links.estimate) + '">Get Estimate</a>');
 
     body.innerHTML =
+      /* One column. The picture and the "Book this service" card that used to
+         sit beside this copy were both removed at the client's request, so a
+         two-column split would leave an empty half. The measure is capped so
+         the text does not run the full width of a large screen. */
       section(
-        '<div class="split split--2-1" style="gap:var(--sp-8)">' +
-          '<div>' +
-            '<h2 class="mb-4">' + FS.esc(s.name) + '</h2>' +
-            '<p class="prose mb-6">' + FS.esc(s.intro) + '</p>' +
-            '<h3 class="mb-3">What is included</h3>' +
-            bulletList(s.bullets) +
-          '</div>' +
-          '<div>' +
-            '<img src="' + FS.url(s.image) + '" alt="' + FS.esc(s.name) + '" style="border-radius:var(--r-lg);width:100%">' +
-            '<div class="card mt-5"><div class="card-body">' +
-              '<h4 class="mb-3">Book this service</h4>' +
-              '<p class="text-muted text-sm mb-5">Tell us how many vehicles and where they are. We handle the rest.</p>' +
-              '<a class="btn btn-primary btn-block mb-3" href="' + FS.url(FS.data.links.estimate) + '">Get Estimate</a>' +
-              '<a class="btn btn-outline btn-block" href="tel:' + C.phoneRaw + '">' + FS.icon('phone') + C.phone + '</a>' +
-            '</div></div>' +
-          '</div>' +
+        '<div style="max-width:78ch">' +
+          '<h2 class="mb-4">' + FS.esc(s.name) + '</h2>' +
+          '<p class="prose mb-6">' + FS.esc(s.intro) + '</p>' +
+          '<h3 class="mb-3">What is included</h3>' +
+          bulletList(s.bullets) +
         '</div>') +
 
       section(headBlock('Why fleets book ' + s.short, 'What you get on every visit.') + featureGrid(s.features), '', 'padding-top:0;background:var(--surface-2)') +
@@ -362,7 +299,7 @@
             '<span>' + FS.esc(v.name) + '</span></a>';
         }).join('') + '</div>', '', 'padding-top:0') +
 
-      ctaBlock() + contactBlock();
+      ctaBlock();
   }
 
   /* ======================================================================
@@ -382,7 +319,7 @@
           '<span class="kpi-icon kpi-icon--navy mb-3">' + FS.icon(i.icon) + '</span>' +
           '<h3>' + FS.esc(i.name) + '</h3><p>' + FS.esc(i.excerpt) + '</p>' +
           '<span class="tile-link">Explore' + FS.icon('arrow-right') + '</span></a>';
-      }).join('') + '</div>') + ctaBlock() + contactBlock();
+      }).join('') + '</div>') + ctaBlock();
   }
 
   function industryDetail() {
@@ -406,26 +343,20 @@
           '<div class="kpi-label mt-2">' + FS.esc(s.l) + '</div></div>';
       }).join('') + '</div>') +
 
+      /* One column. The "Popular services" card that used to sit beside this
+         copy was removed at the client's request; the Get Estimate call it
+         carried is still on the hero and in the closing band below. */
       section(
-        '<div class="split split--2-1" style="gap:var(--sp-8)">' +
-          '<div><h2 class="mb-4">How we work with ' + FS.esc(i.name.toLowerCase()) + '</h2>' +
-          '<p class="prose mb-6">' + FS.esc(i.intro) + '</p>' + bulletList(i.bullets) + '</div>' +
-          '<div class="card"><div class="card-body">' +
-            '<h4 class="mb-4">Popular services</h4>' +
-            Store.catalog('service').slice(0, 5).map(function (s) {
-              return '<a class="row-between" href="' + FS.url('service.html?s=' + s.slug) + '" ' +
-                'style="padding:11px 0;border-bottom:1px solid var(--line-soft);color:var(--ink-700)">' +
-                '<span class="text-semi">' + FS.esc(s.short) + '</span>' + FS.icon('chevron-right') + '</a>';
-            }).join('') +
-            '<a class="btn btn-primary btn-block mt-5" href="' + FS.url(FS.data.links.estimate) + '">Get Estimate</a>' +
-          '</div></div>' +
+        '<div style="max-width:78ch">' +
+          '<h2 class="mb-4">How we work with ' + FS.esc(i.name.toLowerCase()) + '</h2>' +
+          '<p class="prose mb-6">' + FS.esc(i.intro) + '</p>' + bulletList(i.bullets) +
         '</div>', '', 'padding-top:0') +
 
       section(headBlock('Why fleets choose FleetSquad') + featureGrid(D.whyPoints.map(function (w) {
         return { icon: w.icon, title: w.title, text: w.text };
       })), '', 'padding-top:0;background:var(--surface-2)') +
 
-      ctaBlock() + contactBlock();
+      ctaBlock();
   }
 
   /* ======================================================================
@@ -445,7 +376,7 @@
           '<img src="' + FS.url(v.image) + '" alt="' + FS.esc(v.name) + '" style="margin:0 auto var(--sp-4);max-width:260px" loading="lazy">' +
           '<h3>' + FS.esc(v.name) + '</h3><p>' + FS.esc(v.excerpt) + '</p>' +
           '<span class="tile-link" style="justify-content:center">View maintenance' + FS.icon('arrow-right') + '</span></a>';
-      }).join('') + '</div>') + ctaBlock() + contactBlock();
+      }).join('') + '</div>') + ctaBlock();
   }
 
   function vehicleDetail() {
@@ -479,7 +410,7 @@
             '<span class="tile-link">Learn more' + FS.icon('arrow-right') + '</span></a>';
         }).join('') + '</div>', '', 'padding-top:0;background:var(--surface-2)') +
 
-      ctaBlock() + contactBlock();
+      ctaBlock();
   }
 
   /* ======================================================================
@@ -547,14 +478,14 @@
         '<span class="row" style="gap:8px">' + FS.icon('user') + FS.esc(p.author) + '</span>' +
         '<span class="row" style="gap:8px">' + FS.icon('calendar') + FS.date(p.at, 'long') + '</span>' +
         '<span class="row" style="gap:8px">' + FS.icon('clock') + p.read + ' min read</span>' +
-        // Sits in the royal-blue hero, immediately after the read time.
+        // Sits in the royal-blue hero, immediately after the read time. One
+        // control only — it cycles Voice / Pause / Resume, and the separate
+        // stop button beside it was removed at the client's request.
         (canSpeak
           ? '<span class="voice-group">' +
               '<button type="button" class="voice-pill" data-voice-toggle>' +
                 '<span class="voice-ico" data-voice-icon>' + FS.icon('volume') + '</span>' +
                 '<span data-voice-label>Voice</span></button>' +
-              '<button type="button" class="voice-pill voice-pill--stop" data-voice-stop hidden ' +
-                'aria-label="Stop reading">' + FS.icon('stop') + '</button>' +
             '</span>'
           : '') +
       '</div>');
@@ -610,8 +541,6 @@
                         '<button type="button" class="btn btn-sm btn-outline" data-voice-toggle>' +
                           '<span class="voice-ico" data-voice-icon>' + FS.icon('volume') + '</span>' +
                           '<span data-voice-label>Read aloud</span></button>' +
-                        '<button type="button" class="btn btn-sm btn-outline" data-voice-stop hidden ' +
-                          'aria-label="Stop reading">' + FS.icon('stop') + '</button>' +
                       '</span></dd></div>'
                   : '') +
               '</dl>' +
@@ -635,7 +564,6 @@
    */
   function wireVoice(text) {
     var toggles = FS.$$('[data-voice-toggle]');
-    var stops = FS.$$('[data-voice-stop]');
     if (!toggles.length) return;
 
     var LABEL = { idle: 'Voice', playing: 'Pause', paused: 'Resume' };
@@ -652,14 +580,10 @@
         b.classList.toggle('is-active', status !== 'idle');
         b.setAttribute('aria-pressed', status === 'playing' ? 'true' : 'false');
       });
-      stops.forEach(function (b) { b.hidden = status === 'idle'; });
     }
 
     toggles.forEach(function (b) {
       b.addEventListener('click', function () { FS.speech.toggle(text); });
-    });
-    stops.forEach(function (b) {
-      b.addEventListener('click', function () { FS.speech.stop(); });
     });
 
     FS.speech.onChange(paint);
@@ -779,10 +703,11 @@
           '<div class="prose">' + cmsProse('about') + '</div>' +
           '<div class="card"><div class="card-body">' +
             '<h4 class="mb-4">FleetSquad by the numbers</h4>' +
-            D.stats.map(function (s) {
-              return '<div class="money-row"><span>' + FS.esc(s.label) + '</span>' +
+            // Label left, figure right, on the shared baseline .figure-row draws.
+            '<div class="figure-list">' + D.stats.map(function (s) {
+              return '<div class="figure-row"><span>' + FS.esc(s.label) + '</span>' +
                 '<strong>' + (s.decimal ? s.value : FS.num(s.value)) + s.suffix + '</strong></div>';
-            }).join('') +
+            }).join('') + '</div>' +
             '<a class="btn btn-primary btn-block mt-5" href="' + FS.url(FS.data.links.estimate) + '">Get Estimate</a>' +
           '</div></div>' +
         '</div>') +
@@ -796,7 +721,7 @@
         }).join('') + '</div>', '', 'padding-top:0;background:var(--surface-2)') +
 
       section(headBlock('Why fleets choose FleetSquad') + featureGrid(D.whyPoints), '', 'padding-top:0') +
-      ctaBlock() + contactBlock();
+      ctaBlock();
   }
 
   function partnersPage() {
@@ -909,6 +834,9 @@
               '<div class="field"><label class="label" for="cMsg">Message <span class="req">*</span></label>' +
                 '<textarea class="textarea" id="cMsg" name="message" required></textarea></div>' +
               '<button class="btn btn-primary btn-block" type="submit">Send message' + FS.icon('send') + '</button>' +
+              '<p class="text-xs text-dim text-center mt-3 mb-0">Goes to ' +
+                '<a href="mailto:' + FS.esc(C.contactEmail) + '">' + FS.esc(C.contactEmail) + '</a>' +
+                ' — or write to us there directly.</p>' +
             '</form>' +
           '</div></div>' +
           '<div class="stack">' +
@@ -923,8 +851,15 @@
     document.getElementById('contactForm').addEventListener('submit', function (e) {
       e.preventDefault();
       if (!FS.validate(e.target)) return;
+      /* No mail server behind the prototype: the message is filed in this
+         browser, addressed to the support desk, and read in Admin → Inbox. */
+      Store.addMessage(FS.formData(e.target));
       e.target.reset();
-      FS.toast('Message sent', 'A FleetSquad coordinator will reply shortly.', 'ok');
+      if (Store.lastWriteOk === false) {
+        FS.toast('Message sent', 'Held for this visit only — this browser refused to store it.', 'warn');
+        return;
+      }
+      FS.toast('Message sent', 'It is with ' + C.contactEmail + '. A coordinator will reply shortly.', 'ok');
     });
   }
 
@@ -941,11 +876,11 @@
           }).join('') +
         '</div>') +
       section('<div class="card card-pad text-center">' +
+        // Contact us only — the call button beside it was removed.
         '<h3 class="mb-2">Still have a question?</h3>' +
-        '<p class="text-muted mb-6">Call dispatch or send us a message — we answer every one.</p>' +
+        '<p class="text-muted mb-6">Send us a message — we answer every one.</p>' +
         '<div class="row row-wrap" style="gap:var(--sp-3);justify-content:center">' +
-          '<a class="btn btn-primary" href="tel:' + C.phoneRaw + '">' + FS.icon('phone') + C.phone + '</a>' +
-          '<a class="btn btn-outline" href="' + FS.url('pages/contact.html') + '">Contact us</a>' +
+          '<a class="btn btn-primary" href="' + FS.url('pages/contact.html') + '">Contact us</a>' +
         '</div></div>', '', 'padding-top:0') +
       ctaBlock();
   }

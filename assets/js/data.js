@@ -37,6 +37,10 @@
     phoneRaw: '18883916324',
     phoneShort: '888-391-MECH',
     email: 'support@FleetSquad.com',
+    /* Where a message sent from the public contact form is addressed. Kept
+       separate from `email` above — that is the address printed on the site;
+       this is the desk the client wants the form to land on. */
+    contactEmail: 'support@mobilemechanic.com',
     website: 'www.fleetsquad.com',
     hours: 'Everyday 9am to 9pm',
     network: 'Network 24-7',
@@ -726,6 +730,32 @@
   ];
 
   /* ======================================================================
+     Contact inbox
+     Messages sent from the public contact form. There is no mail server in
+     this prototype, so a submission is filed here and read in Admin → Inbox.
+     Seeded with a few so the screen has something in it on a first visit.
+     ====================================================================== */
+
+  D.inbox = [
+    { id: 'MSG-1004', at: daysAgo(0, 8), read: false,
+      name: 'Priya Raman', company: 'Northwind Couriers', email: 'priya@northwindcouriers.com',
+      phone: '(206) 555-0119', topic: 'New fleet enquiry',
+      message: 'We run 34 sprinter vans out of two depots in Seattle and are looking to move off our current shop. Can you quote a monthly PM programme with overnight servicing?' },
+    { id: 'MSG-1003', at: daysAgo(1, 16), read: false,
+      name: 'Dale Whitcomb', company: 'Whitcomb Haulage', email: 'dale@whitcombhaulage.com',
+      phone: '(404) 555-0187', topic: 'Existing project',
+      message: 'PRJ-1230 — one of the trailers was not on site when your tech arrived. Can we get it picked up on the next visit rather than a separate call-out?' },
+    { id: 'MSG-1002', at: daysAgo(4, 11), read: true,
+      name: 'Sonia Alvarez', company: 'Cedar Ridge Rentals', email: 'sonia@cedarridgerentals.com',
+      phone: '(602) 555-0143', topic: 'Billing',
+      message: 'Could you send the October invoices as one consolidated PDF? Our finance team cannot process them branch by branch.' },
+    { id: 'MSG-1001', at: daysAgo(9, 14), read: true,
+      name: 'Ben Okafor', company: 'Okafor Plumbing Co', email: 'ben@okaforplumbing.com',
+      phone: '(713) 555-0165', topic: 'Careers',
+      message: 'Do you take on apprentice techs? I have a diesel cert and two years in a bay, looking to move to mobile work.' }
+  ];
+
+  /* ======================================================================
      Payments ledger
      ====================================================================== */
 
@@ -840,6 +870,13 @@
      ====================================================================== */
 
   D.cmsPages = [
+    /* The homepage. Its copy is not edited here — the hero is markup and the
+       blocks under it are drawn from services, reviews and the blog — but its
+       search-engine record belongs with the rest of the site's, so it is
+       listed as a meta-only page. `url` and `address` are spelt out because
+       home is the one page that does not live under /pages/. */
+    { slug: 'home', title: 'Home', updated: daysAgo(2), status: 'published', sections: 0,
+      url: 'index.html', address: '/', metaOnly: true },
     { slug: 'about', title: 'About Us', updated: daysAgo(6), status: 'published', sections: 4,
       heading: 'Mobile fleet maintenance, built around uptime',
       lead: 'We started FleetSquad because a vehicle driven to a shop is already costing you money.',
@@ -1289,7 +1326,9 @@
   /* The sheet is also the source for the CMS page records, so what an admin
      opens in Admin -> CMS Pages is what the sheet says. */
   D.cmsPages.forEach(function (p) {
-    var entry = D.seo['cms:' + p.slug];
+    // Home is the one CMS page the sheet lists under its own name rather than
+    // a 'cms:' key, because it is also the record index.html ships in markup.
+    var entry = D.seo['cms:' + p.slug] || D.seo[p.slug];
     if (!entry) return;
     p.metaTitle = entry.title;
     p.metaDescription = entry.description;
