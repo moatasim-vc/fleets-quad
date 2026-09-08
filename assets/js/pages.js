@@ -246,9 +246,12 @@
     body.innerHTML =
       section('<div class="grid grid-3">' + Store.catalog('service').map(function (s) {
         return '<a class="svc-card" href="' + FS.url('service.html?s=' + s.slug) + '">' +
-          '<div class="svc-media">' +
-            '<img src="' + FS.url(s.image) + '" alt="' + FS.esc(s.name) + '" loading="lazy">' +
-            '<span class="svc-icon">' + FS.icon(s.icon) + '</span>' +
+          // Same fallback as the homepage grid — see renderServices() in home.js.
+          '<div class="svc-media' + (s.image ? '' : ' svc-media--empty') + '">' +
+            (s.image
+              ? '<img src="' + FS.url(s.image) + '" alt="' + FS.esc(s.name) + '" loading="lazy">' +
+                '<span class="svc-icon">' + FS.icon(s.icon) + '</span>'
+              : FS.icon(s.icon || 'truck-wrench')) +
           '</div>' +
           '<div class="svc-body"><h3>' + FS.esc(s.name) + '</h3>' +
             '<p class="svc-desc">' + FS.esc(s.excerpt) + '</p>' +

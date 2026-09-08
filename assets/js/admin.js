@@ -2945,8 +2945,17 @@
     var meta = Store.catalogMeta[kind];
     var slug = FS.param('s');
     var item = meta && Store.catalogItem(kind, slug);
-    /* Only vehicle types render a picture anywhere on the site. */
-    var hasPicture = kind === 'vehicle';
+    /* Industries are the one catalog the site draws no artwork for. A service
+       picture is the card thumbnail on the homepage and the services index; a
+       vehicle picture is the homepage row and the vehicles index. Both have to
+       be manageable here, because nothing else can set them. */
+    var hasPicture = kind !== 'industry';
+    var picturePlaceholder = kind === 'service'
+      ? 'assets/img/services/example.jpg'
+      : 'assets/img/vehicles/example.png';
+    var pictureWhere = kind === 'service'
+      ? 'The thumbnail on the homepage service cards and the services index.'
+      : 'The artwork on the homepage vehicle rows and the vehicles index.';
 
     if (!item) {
       host.innerHTML = '<div class="empty-state">' + FS.icon('help-circle') +
@@ -3033,14 +3042,14 @@
 
           '<div>' +
             /* --- Picture / icon --------------------------------------- */
-            /* The picture control is for vehicle types only. Their artwork is
-               the design on the homepage row and the vehicles index, so it has
-               to be manageable. Services no longer show a picture on their own
-               page, and industries never had one, so neither offers the field. */
+            /* The field is offered wherever the site actually draws the
+               picture — service cards and vehicle rows. Industries draw none,
+               so that catalog gets the icon on its own. */
             '<div class="card mb-5"><div class="card-head"><h3>' +
               (hasPicture ? 'Picture and icon' : 'Icon') + '</h3></div><div class="card-body">' +
               (hasPicture
                 ? '<div class="field"><span class="label">Image</span>' +
+                    '<p class="text-muted text-sm mb-3">' + pictureWhere + '</p>' +
                     '<div class="img-picker">' +
                       '<span class="img-preview" id="ceImgPreview">' +
                         (item.image ? '<img src="' + FS.esc(FS.url(item.image)) + '" alt="">' : FS.icon('image')) +
@@ -3048,13 +3057,15 @@
                       '<div class="img-picker-tools">' +
                         '<label class="btn btn-sm btn-outline btn-file">' + FS.icon('upload') + 'Upload' +
                           '<input type="file" accept="image/*" id="ceImgFile"></label>' +
+                        '<button type="button" class="btn btn-sm btn-outline" id="ceImgClear"' +
+                          (item.image ? '' : ' disabled') + '>' + FS.icon('trash') + 'Remove</button>' +
                       '</div>' +
                     '</div>' +
                     '<input type="hidden" id="ceImage" name="image" value="' + FS.esc(item.image || '') + '">' +
                     '<div class="field mt-4 mb-0"><label class="label" for="ceImgUrl">Or paste an address</label>' +
                       '<input class="input" id="ceImgUrl" ' +
                       'value="' + FS.esc(/^data:/.test(item.image || '') ? '' : (item.image || '')) + '" ' +
-                      'placeholder="assets/img/vehicles/example.png"></div>' +
+                      'placeholder="' + picturePlaceholder + '"></div>' +
                     '<p class="hint" id="ceImgHint">Any size — it is resized on upload and cropped to fit.</p>' +
                   '</div>'
                 : '') +
@@ -3214,15 +3225,17 @@
       iconSel.addEventListener('change', paintIcon);
       paintIcon();
 
-      /* Picture — vehicle types only; the other two catalogs have no field. */
+      /* Picture — services and vehicle types; industries have no field. */
       if (hasPicture) {
         var image = document.getElementById('ceImage');
         var preview = document.getElementById('ceImgPreview');
         var urlField = document.getElementById('ceImgUrl');
+        var clearBtn = document.getElementById('ceImgClear');
         var setImage = function (v, note) {
           image.value = v || '';
           preview.innerHTML = v ? '<img src="' + FS.esc(FS.url(v)) + '" alt="">' : FS.icon('image');
           FS.hydrateIcons(preview);
+          clearBtn.disabled = !v;
           if (note) document.getElementById('ceImgHint').textContent = note;
         };
         document.getElementById('ceImgFile').addEventListener('change', function () {
@@ -3235,6 +3248,13 @@
           });
         });
         urlField.addEventListener('input', function () { setImage(this.value.trim(), 'Loaded from an address.'); });
+        /* Clearing it is a real choice, not a mistake: the card falls back to
+           the icon tile rather than showing a broken picture. */
+        clearBtn.addEventListener('click', function () {
+          urlField.value = '';
+          document.getElementById('ceImgFile').value = '';
+          setImage('', 'No picture — the card will show the icon instead.');
+        });
       }
 
       document.getElementById('ceAddBullet').addEventListener('click', function () {
@@ -3272,7 +3292,7 @@
         name: form.name,
         short: form.short || form.name,
         icon: form.icon,
-        // Without a picture control on the form there is no value to read, so
+        // Industries have no picture control, so there is no value to read and
         // whatever the record already holds is carried through untouched.
         image: hasPicture ? form.image : item.image,
         excerpt: form.excerpt,

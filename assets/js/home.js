@@ -73,9 +73,13 @@
     if (!host) return;
     host.innerHTML = FS.store.catalog('service').slice(0, 6).map(function (s) {
       return '<a class="svc-card" href="' + FS.url('service.html?s=' + s.slug) + '">' +
-        '<div class="svc-media">' +
-          '<img src="' + FS.url(s.image) + '" alt="' + FS.esc(s.name) + '" loading="lazy">' +
-          '<span class="svc-icon">' + FS.icon(s.icon) + '</span>' +
+        // The picture is set in Admin → Services. Cleared there, the tile falls
+        // back to the record's icon rather than an <img> with nothing behind it.
+        '<div class="svc-media' + (s.image ? '' : ' svc-media--empty') + '">' +
+          (s.image
+            ? '<img src="' + FS.url(s.image) + '" alt="' + FS.esc(s.name) + '" loading="lazy">' +
+              '<span class="svc-icon">' + FS.icon(s.icon) + '</span>'
+            : FS.icon(s.icon || 'truck-wrench')) +
         '</div>' +
         '<div class="svc-body">' +
           '<h3>' + FS.esc(s.name) + '</h3>' +
