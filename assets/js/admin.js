@@ -1555,6 +1555,329 @@
   }
 
   /* ======================================================================
+     Jobs
+     The open roles on the public careers page, and the applications that
+     page collected. There is no recruiting mailbox behind the prototype, so
+     an application is filed in the browser and read here.
+     ====================================================================== */
+
+  function jobs() {
+    /* The tab is held here rather than left to the class toggle in core.js,
+       so acting on an application does not throw you back to the roles. */
+    var state = { tab: FS.param('tab') === 'applications' ? 'applications' : 'roles' };
+    render();
+
+    function render() {
+      var all = Store.jobs();
+      var apps = Store.applications();
+      var unread = Store.applicationsUnread();
+
+      host.innerHTML =
+        '<div class="page-head"><div><h2>Jobs</h2>' +
+          '<p>The roles advertised on the careers page, and everyone who has applied. ' +
+            'Only roles marked <strong>open</strong> appear on the website.</p></div>' +
+          '<div class="page-head-actions">' +
+            '<a class="btn btn-outline" href="' + FS.url('pages/careers.html') + '" target="_blank" rel="noopener">' +
+              FS.icon('external') + 'Careers page</a>' +
+            '<button class="btn btn-primary" id="jbNew">' + FS.icon('plus') + 'New role</button>' +
+          '</div></div>' +
+
+        Dash.kpiGrid([
+          { icon: 'briefcase', tone: 'navy', label: 'Open roles', value: all.filter(is('open')).length },
+          { icon: 'edit',      tone: 'warn', label: 'Drafts',     value: all.filter(is('draft')).length },
+          { icon: 'users',     tone: 'ok',   label: 'Applications', value: apps.length },
+          { icon: 'mail',      tone: unread ? 'danger' : '', label: 'Unread', value: unread }
+        ], 'kpi-grid--4') +
+
+        '<div data-tabs><div class="tabs">' +
+          '<button class="tab' + (state.tab === 'roles' ? ' is-active' : '') + '" data-tab="roles">' +
+            'Open roles (' + all.length + ')</button>' +
+          '<button class="tab' + (state.tab === 'applications' ? ' is-active' : '') + '" data-tab="applications">' +
+            'Applications (' + apps.length + ')' +
+            (unread ? ' <span class="badge badge--danger">' + unread + '</span>' : '') + '</button>' +
+        '</div>' +
+
+        '<div class="tab-panel' + (state.tab === 'roles' ? ' is-active' : '') + '" data-panel="roles">' +
+          rolesPanel(all) + '</div>' +
+
+        '<div class="tab-panel' + (state.tab === 'applications' ? ' is-active' : '') + '" data-panel="applications">' +
+          applicationsPanel(apps, unread) + '</div>' +
+        '</div>';
+
+      wire();
+    }
+
+    function is(status) { return function (j) { return j.status === status; }; }
+
+    /* --- Roles ---------------------------------------------------------- */
+
+    function rolesPanel(list) {
+      if (!list.length) {
+        return '<div class="table-wrap"><div class="table-empty">' + FS.icon('briefcase') +
+          '<p class="mt-3">No roles yet. Add one and it appears on the careers page ' +
+          'as soon as you mark it open.</p></div></div>';
+      }
+      return '<div class="table-wrap"><div class="scroll-x">' +
+        '<table class="table table--stack"><thead><tr>' +
+          '<th>Role</th><th>Department</th><th>Location</th><th>Type</th>' +
+          '<th>Posted</th><th>Applications</th><th>Status</th><th class="td-actions">Actions</th>' +
+        '</tr></thead><tbody>' + list.map(roleRow).join('') + '</tbody></table></div></div>';
+    }
+
+    function roleRow(j, i, list) {
+      var count = Store.applications(j.id).length;
+      var tone = { open: 'ok', draft: 'warn', closed: 'neutral' }[j.status] || 'neutral';
+      var teaser = String(j.text || '').replace(/\s+/g, ' ');
+      if (teaser.length > 90) teaser = teaser.slice(0, 89).replace(/\s\S*$/, '') + '…';
+
+      return '<tr>' +
+        '<td data-label="Role"><span class="td-strong" style="display:block">' + FS.esc(j.title) + '</span>' +
+          '<small class="text-xs text-dim">' + FS.esc(teaser || 'No description yet') + '</small></td>' +
+        '<td data-label="Department">' + FS.esc(j.dept || '—') + '</td>' +
+        '<td data-label="Location">' + FS.esc(j.location || '—') + '</td>' +
+        '<td data-label="Type">' + FS.esc(j.type || '—') + '</td>' +
+        '<td data-label="Posted">' + (j.posted ? FS.date(j.posted) : '—') + '</td>' +
+        '<td data-label="Applications">' +
+          (count
+            ? '<button class="btn btn-xs btn-outline" data-jbapps="' + FS.esc(j.id) + '">' + count + '</button>'
+            : '<span class="text-dim">0</span>') + '</td>' +
+        '<td data-label="Status"><span class="badge badge--' + tone + '">' + FS.esc(j.status) + '</span></td>' +
+        '<td class="td-actions" data-label="Actions">' +
+          '<button class="btn btn-xs btn-outline" data-jbedit="' + FS.esc(j.id) + '">' +
+            FS.icon('edit') + 'Edit</button> ' +
+          '<button class="btn btn-xs btn-outline" data-jbmove="' + FS.esc(j.id) + '" data-by="-1"' +
+            (i === 0 ? ' disabled' : '') + ' aria-label="Move up">' + FS.icon('arrow-up') + '</button> ' +
+          '<button class="btn btn-xs btn-outline" data-jbmove="' + FS.esc(j.id) + '" data-by="1"' +
+            (i === list.length - 1 ? ' disabled' : '') + ' aria-label="Move down">' + FS.icon('arrow-down') + '</button> ' +
+          '<button class="btn btn-xs btn-danger" data-jbdel="' + FS.esc(j.id) + '" ' +
+            'aria-label="Delete role">' + FS.icon('trash') + '</button>' +
+        '</td>' +
+      '</tr>';
+    }
+
+    /** Add or edit a role. The public card is title, the three chips and the
+        paragraph, so the form is those and the status that gates it. */
+    function jobModal(j) {
+      FS.modal({
+        title: 'Edit role',
+        subtitle: j.id + ' · ' + (j.status === 'open' ? 'live on the careers page' : 'not on the careers page'),
+        size: 'lg',
+        body:
+          '<form id="jbForm" novalidate>' +
+            '<div class="field"><label class="label" for="jbTitle">Job title <span class="req">*</span></label>' +
+              '<input class="input" id="jbTitle" name="title" value="' + FS.esc(j.title || '') + '" required>' +
+              '<p class="hint">The heading on the card.</p></div>' +
+            '<div class="field-row field-row-2">' +
+              '<div class="field"><label class="label" for="jbDept">Department</label>' +
+                select('jbDept', 'dept', D.jobDepartments, j.dept) + '</div>' +
+              '<div class="field"><label class="label" for="jbType">Type</label>' +
+                select('jbType', 'type', D.jobTypes, j.type) + '</div>' +
+            '</div>' +
+            '<div class="field-row field-row-2">' +
+              '<div class="field"><label class="label" for="jbLoc">Location</label>' +
+                '<input class="input" id="jbLoc" name="location" value="' + FS.esc(j.location || '') + '" ' +
+                'placeholder="Dallas, TX or Remote (US)"></div>' +
+              '<div class="field"><label class="label" for="jbStatus">Status</label>' +
+                select('jbStatus', 'status', D.jobStatuses, j.status) +
+                '<p class="hint">Only <strong>open</strong> roles are advertised.</p></div>' +
+            '</div>' +
+            '<div class="field mb-0"><label class="label" for="jbText">Description</label>' +
+              '<textarea class="textarea" id="jbText" name="text" style="min-height:120px">' +
+              FS.esc(j.text || '') + '</textarea>' +
+              '<p class="hint">A short paragraph — what the job is and what it needs.</p></div>' +
+          '</form>',
+        footer:
+          '<button class="btn btn-outline" data-close>Cancel</button>' +
+          '<button class="btn btn-primary" id="jbSave">' + FS.icon('check') + 'Save role</button>',
+        onMount: function (root, close) {
+          root.querySelector('#jbSave').addEventListener('click', function () {
+            var form = root.querySelector('#jbForm');
+            if (!FS.validate(form)) return;
+            Store.saveJob(j.id, FS.formData(form));
+            close();
+            FS.toast('Role saved', Store.job(j.id).title, 'ok');
+            render();
+          });
+        }
+      });
+
+      function select(id, name, options, value) {
+        return '<select class="select" id="' + id + '" name="' + name + '">' +
+          options.map(function (o) {
+            return '<option value="' + FS.esc(o) + '"' + (o === value ? ' selected' : '') + '>' +
+              FS.esc(o) + '</option>';
+          }).join('') + '</select>';
+      }
+    }
+
+    /* --- Applications --------------------------------------------------- */
+
+    function applicationsPanel(list, unread) {
+      if (!list.length) {
+        return '<div class="card"><div class="empty-state">' + FS.icon('users') +
+          '<h4>No applications yet</h4>' +
+          '<p>Anything sent from the Apply form on the careers page lands here.</p></div></div>';
+      }
+      return '<div class="card"><div class="card-head">' +
+          '<h3>Applications ' +
+            (unread ? '<span class="badge badge--danger">' + unread + ' unread</span>' : '') + '</h3>' +
+          '<button class="btn btn-sm btn-outline" id="jbReadAll"' + (unread ? '' : ' disabled') + '>' +
+            FS.icon('check') + 'Mark all read</button></div>' +
+        list.map(applicationRow).join('') + '</div>';
+    }
+
+    function applicationRow(a) {
+      var teaser = String(a.why || '').replace(/\s+/g, ' ');
+      if (teaser.length > 150) teaser = teaser.slice(0, 149).replace(/\s\S*$/, '') + '…';
+
+      return '<div class="note-item' + (a.read ? '' : ' is-unread') + '" ' +
+          'data-jbopen="' + FS.esc(a.id) + '" style="cursor:pointer">' +
+        '<span class="note-channel note-channel--email">' + FS.icon('user') + '</span>' +
+        '<div class="note-body">' +
+          '<strong>' + FS.esc(a.name) + ' · ' + FS.esc(a.jobTitle) + '</strong>' +
+          '<p>' + FS.esc(teaser || 'No covering note.') + '</p>' +
+          '<small class="text-xs text-dim">' + FS.esc(a.email) +
+            (a.phone ? ' · ' + FS.esc(a.phone) : '') +
+            (a.certs ? ' · ' + FS.esc(a.certs) : '') + '</small>' +
+        '</div>' +
+        '<div class="stack" style="gap:6px;align-items:flex-end">' +
+          '<span class="note-time">' + FS.ago(a.at) + '</span>' +
+          '<span class="row" style="gap:4px">' +
+            '<button class="btn btn-xs btn-outline" data-jbtoggle="' + FS.esc(a.id) + '">' +
+              (a.read ? 'Mark unread' : 'Mark read') + '</button>' +
+            '<button class="btn btn-xs btn-danger" data-jbappdel="' + FS.esc(a.id) + '" ' +
+              'aria-label="Delete application">' + FS.icon('trash') + '</button>' +
+          '</span>' +
+        '</div>' +
+      '</div>';
+    }
+
+    /** Read one in full. Opening it counts as reading it. */
+    function openApplication(id) {
+      var a = Store.application(id);
+      if (!a) return;
+      Store.markApplicationRead(a.id);
+
+      FS.modal({
+        title: a.name,
+        subtitle: 'Applied for ' + a.jobTitle + ' · ' + FS.date(a.at, 'long'),
+        size: 'lg',
+        body:
+          '<dl class="dl dl--2 mb-5">' +
+            '<div><dt>Email</dt><dd><a href="mailto:' + FS.esc(a.email) + '">' + FS.esc(a.email) + '</a></dd></div>' +
+            '<div><dt>Phone</dt><dd>' + (a.phone
+              ? '<a href="tel:' + FS.esc(a.phone) + '">' + FS.esc(a.phone) + '</a>' : '—') + '</dd></div>' +
+            '<div><dt>Certifications</dt><dd>' + FS.esc(a.certs || '—') + '</dd></div>' +
+            '<div><dt>Role</dt><dd>' + FS.esc(a.jobTitle) + '</dd></div>' +
+          '</dl>' +
+          '<h4 class="mb-2">Why FleetSquad?</h4>' +
+          '<p class="prose" style="white-space:pre-line">' + FS.esc(a.why || 'Nothing written.') + '</p>',
+        footer:
+          '<button class="btn btn-outline" data-close>Close</button>' +
+          // A plain button, not a mailto link — opening the desktop mail client
+          // from the dashboard is not wanted here. The address is in the list
+          // above to copy.
+          '<button class="btn btn-primary">' + FS.icon('mail') + 'Reply by email</button>'
+      });
+      render();
+    }
+
+    /* --- Wiring --------------------------------------------------------- */
+
+    function wire() {
+      // core.js does the visual tab swap; this just remembers which one, so a
+      // re-render after an edit comes back to the same place.
+      FS.$$('[data-tab]', host).forEach(function (t) {
+        t.addEventListener('click', function () { state.tab = t.dataset.tab; });
+      });
+
+      document.getElementById('jbNew').addEventListener('click', function () {
+        var job = Store.createJob();
+        state.tab = 'roles';
+        FS.toast('Role added', 'Saved as a draft — fill it in, then mark it open.', 'ok');
+        render();
+        jobModal(job);
+      });
+
+      FS.$$('[data-jbedit]', host).forEach(function (b) {
+        b.addEventListener('click', function () { jobModal(Store.job(b.dataset.jbedit)); });
+      });
+
+      FS.$$('[data-jbmove]', host).forEach(function (b) {
+        b.addEventListener('click', function () {
+          Store.moveJob(b.dataset.jbmove, Number(b.dataset.by));
+          render();
+        });
+      });
+
+      FS.$$('[data-jbdel]', host).forEach(function (b) {
+        b.addEventListener('click', function () {
+          var j = Store.job(b.dataset.jbdel);
+          var count = Store.applications(j.id).length;
+          FS.confirm('Delete "' + j.title + '"?',
+            'The role is removed from the careers page' +
+            (count ? '. Its ' + count + ' application' + (count === 1 ? '' : 's') +
+              ' stay in the list.' : '.') +
+            ' To take it down without losing it, set the status to closed instead.',
+            function () {
+              Store.deleteJob(j.id);
+              FS.toast('Role deleted', j.title, 'ok');
+              render();
+            }, true);
+        });
+      });
+
+      // The application count on a role row jumps to that role's applications.
+      FS.$$('[data-jbapps]', host).forEach(function (b) {
+        b.addEventListener('click', function () {
+          state.tab = 'applications';
+          render();
+          var first = Store.applications(b.dataset.jbapps)[0];
+          if (first) openApplication(first.id);
+        });
+      });
+
+      FS.$$('[data-jbopen]', host).forEach(function (el) {
+        el.addEventListener('click', function () { openApplication(el.dataset.jbopen); });
+      });
+
+      FS.$$('[data-jbtoggle]', host).forEach(function (b) {
+        b.addEventListener('click', function (e) {
+          e.stopPropagation();
+          var a = Store.application(b.dataset.jbtoggle);
+          Store.markApplicationRead(a.id, !a.read);
+          render();
+        });
+      });
+
+      FS.$$('[data-jbappdel]', host).forEach(function (b) {
+        b.addEventListener('click', function (e) {
+          e.stopPropagation();
+          var a = Store.application(b.dataset.jbappdel);
+          FS.confirm('Delete this application?',
+            'The application from ' + a.name + ' is removed. This cannot be undone.',
+            function () {
+              Store.deleteApplication(a.id);
+              FS.toast('Application deleted', a.name, 'ok');
+              render();
+            }, true);
+        });
+      });
+
+      var readAll = document.getElementById('jbReadAll');
+      if (readAll) readAll.addEventListener('click', function () {
+        Store.markAllApplicationsRead();
+        FS.toast('Applications cleared', 'Every application is marked read.', 'ok');
+        render();
+      });
+
+      // The sidebar pill is the same unread number, so keep the two in step.
+      FS.refreshNavCounts();
+      FS.hydrateIcons(host);
+    }
+  }
+
+  /* ======================================================================
      CMS pages
      ====================================================================== */
 
@@ -3345,6 +3668,7 @@
     'reviews': reviews,
     'notifications': notifications,
     'inbox': inbox,
+    'jobs': jobs,
     'cms': cms,
     'blog': blog,
     'blog-edit': blogEdit,

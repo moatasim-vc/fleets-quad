@@ -762,6 +762,12 @@
   Dash.usersView = function (mount, opts) {
     opts = opts || {};
     var actor = (FS.shell && FS.shell.session) ? FS.shell.session.name : 'Admin';
+    /* Editing an account, and reaching into its projects from here, is the
+       admin's job. The same screen sits on the manager's sidebar, where it
+       stays the read-only directory it has always been. */
+    var canEdit = opts.canEdit !== undefined
+      ? opts.canEdit
+      : !!(FS.shell && FS.shell.role === 'admin');
     var state = { tab: FS.param('type', 'all'), q: '' };
 
     render();
@@ -780,8 +786,11 @@
 
       mount.innerHTML =
         '<div class="page-head"><div><h2>Users</h2>' +
-          '<p>' + list.length + ' account' + (list.length === 1 ? '' : 's') +
-          ' — newest at the top. Open any portal as that user, or send them a password reset.</p></div></div>' +
+          '<p>' + list.length + ' account' + (list.length === 1 ? '' : 's') + ' — newest at the top. ' +
+          (canEdit
+            ? 'Edit any account, assign and manage its projects, open the portal as that user, or send a password reset.'
+            : 'Open any portal as that user, or send them a password reset.') +
+          '</p></div></div>' +
 
         Dash.kpiGrid([
           { icon: 'briefcase', tone: 'navy', label: 'Customers', value: all.filter(byRole('customer')).length },
@@ -829,6 +838,9 @@
         '<td data-label="Joined">' + (p.since ? FS.date(p.since) : '—') + '</td>' +
         '<td class="td-actions" data-label="Actions">' +
           '<button class="btn btn-xs btn-outline" data-uview="' + FS.esc(p.key) + '">' + FS.icon('eye') + 'Details</button> ' +
+          (canEdit
+            ? '<button class="btn btn-xs btn-outline" data-uedit="' + FS.esc(p.key) + '">' + FS.icon('edit') + 'Edit</button> '
+            : '') +
           '<button class="btn btn-xs btn-outline" data-ureset="' + FS.esc(p.key) + '">' + FS.icon('lock') + 'Reset password</button> ' +
           (p.role === 'admin' ? '' :
             '<button class="btn btn-xs btn-dark" data-uimp="' + FS.esc(p.key) + '">' + FS.icon('user') + 'Impersonate</button>') +
@@ -856,6 +868,10 @@
 
       FS.$$('[data-uview]', mount).forEach(function (b) {
         b.addEventListener('click', function () { detailModal(Store.person(b.dataset.uview)); });
+      });
+
+      FS.$$('[data-uedit]', mount).forEach(function (b) {
+        b.addEventListener('click', function () { editModal(Store.person(b.dataset.uedit)); });
       });
 
       FS.$$('[data-ureset]', mount).forEach(function (b) {
@@ -888,27 +904,230 @@
             d('Account type', p.type) + d('Joined', p.since ? FS.date(p.since, 'long') : '—') +
             d('Portal username', p.email) + d('Reference ID', p.refId || '—') +
           '</dl>' +
-          '<h4 class="mb-3">Projects (' + orders.length + ')</h4>' +
+          '<div class="row-between mb-3"><h4 class="mb-0">Projects (' + orders.length + ')</h4>' +
+            (canEdit && p.role === 'mechanic'
+              ? '<button class="btn btn-sm btn-outline" id="udGive">' +
+                FS.icon('user-plus') + 'Assign a project</button>'
+              : '') +
+          '</div>' +
           (orders.length
             ? '<div class="scroll-x"><table class="table table--compact"><tbody>' +
               orders.slice(0, 8).map(function (o) {
                 return '<tr><td class="td-strong">' + FS.esc(o.id) + '</td>' +
                   '<td>' + FS.esc(o.serviceType) + '</td>' +
                   '<td>' + Dash.statusBadge(o.status) + '</td>' +
-                  '<td class="text-right td-strong">' + FS.money(Store.orderTotal(o)) + '</td></tr>';
-              }).join('') + '</tbody></table></div>'
+                  '<td class="text-right td-strong">' + FS.money(Store.orderTotal(o)) + '</td>' +
+                  (canEdit
+                    ? '<td class="td-actions">' +
+                        '<button class="btn btn-xs btn-outline" data-passign="' + FS.esc(o.id) + '">' +
+                          FS.icon('user-plus') + (o.mechanicId ? 'Reassign' : 'Assign') + '</button> ' +
+                        '<button class="btn btn-xs btn-outline" data-pstatus="' + FS.esc(o.id) + '">' +
+                          FS.icon('refresh') + 'Status</button> ' +
+                        '<a class="btn btn-xs btn-outline" href="' +
+                          FS.url('admin/order-details.html?id=' + o.id) + '">' +
+                          FS.icon('external') + 'Open</a>' +
+                      '</td>'
+                    : '') +
+                  '</tr>';
+              }).join('') + '</tbody></table></div>' +
+              (orders.length > 8
+                ? '<p class="hint mt-3">Showing the 8 most recent of ' + orders.length + '.</p>'
+                : '')
             : '<p class="text-dim">No projects yet.</p>'),
         footer: '<button class="btn btn-outline" data-close>Close</button>' +
+          (canEdit ? '<button class="btn btn-outline" id="udEdit">' + FS.icon('edit') + 'Edit details</button>' : '') +
           '<button class="btn btn-outline" id="udReset">' + FS.icon('lock') + 'Reset password</button>' +
           (p.role === 'admin' ? '' : '<button class="btn btn-primary" id="udImp">' + FS.icon('user') + 'Impersonate</button>'),
         onMount: function (root, close) {
           root.querySelector('#udReset').addEventListener('click', function () { close(); resetModal(p); });
           var imp = root.querySelector('#udImp');
           if (imp) imp.addEventListener('click', function () { close(); impersonate(p); });
+
+          var edit = root.querySelector('#udEdit');
+          if (edit) edit.addEventListener('click', function () { close(); editModal(p); });
+
+          var give = root.querySelector('#udGive');
+          if (give) give.addEventListener('click', function () { close(); assignProjectModal(p); });
+
+          /* Only one dialog is on screen at a time — the details close, the
+             action runs, and the details reopen showing what changed. */
+          FS.$$('[data-passign]', root).forEach(function (b) {
+            b.addEventListener('click', function () {
+              var o = Store.order(b.dataset.passign);
+              close();
+              Dash.assignModal(o, function () { render(); detailModal(Store.person(p.key)); });
+            });
+          });
+          FS.$$('[data-pstatus]', root).forEach(function (b) {
+            b.addEventListener('click', function () {
+              var o = Store.order(b.dataset.pstatus);
+              close();
+              Dash.statusModal(o, function () { render(); detailModal(Store.person(p.key)); });
+            });
+          });
         }
       });
 
       function d(k, v) { return '<div><dt>' + FS.esc(k) + '</dt><dd>' + FS.esc(v == null ? '—' : v) + '</dd></div>'; }
+    }
+
+    /* --- Editing an account --------------------------------------------
+       One form for four kinds of account. The fields come from
+       FS.data.personFields, so the shape of each is described in one place
+       and the store writes the values straight onto the record. */
+    function editModal(p) {
+      if (!p) return;
+      var found = Store.personRecord(p.key);
+      if (!found) { FS.toast('Not found', 'That account no longer exists.', 'warn'); render(); return; }
+
+      var fields = D.personFields[found.role] || [];
+
+      FS.modal({
+        title: 'Edit ' + p.name,
+        subtitle: p.type + ' · ' + (p.refId || p.email),
+        size: 'lg',
+        body:
+          '<form id="peForm" novalidate>' + fieldRows(fields, found.record) + '</form>' +
+          '<div class="alert alert--info">' + FS.icon('info') +
+            '<div>The email address is the portal username. Change it and the sign-in moves ' +
+            'with it — the current password keeps working.</div></div>',
+        footer:
+          '<button class="btn btn-outline" data-close>Cancel</button>' +
+          '<button class="btn btn-primary" id="peSave">' + FS.icon('check') + 'Save changes</button>',
+        onMount: function (root, close) {
+          root.querySelector('#peSave').addEventListener('click', function () {
+            var form = root.querySelector('#peForm');
+            if (!FS.validate(form)) return;
+
+            var out = Store.savePerson(p.key, FS.formData(form));
+            if (!out.ok) { FS.toast('Not saved', out.error, 'warn'); return; }
+
+            close();
+            if (Store.lastWriteOk === false) {
+              FS.toast('Saved for this visit only', 'This browser refused to store the change.', 'warn');
+            } else {
+              FS.toast('Account updated', out.person.name, 'ok');
+            }
+            render();
+          });
+        }
+      });
+    }
+
+    /** Two `half` fields share a row; everything else runs full width. */
+    function fieldRows(fields, record) {
+      var out = '', i = 0;
+      while (i < fields.length) {
+        if (fields[i].half && fields[i + 1] && fields[i + 1].half) {
+          out += '<div class="field-row field-row-2">' +
+            personField(fields[i], record) + personField(fields[i + 1], record) + '</div>';
+          i += 2;
+        } else {
+          out += personField(fields[i], record);
+          i += 1;
+        }
+      }
+      return out;
+    }
+
+    function personField(f, record) {
+      var value = record[f.key] == null ? '' : String(record[f.key]);
+      var id = 'pe_' + f.key;
+      var control;
+
+      if (f.type === 'select') {
+        control = '<select class="select" id="' + id + '" name="' + f.key + '">' +
+          f.options.map(function (o) {
+            return '<option value="' + FS.esc(o) + '"' + (o === value ? ' selected' : '') + '>' +
+              FS.esc(o) + '</option>';
+          }).join('') + '</select>';
+      } else {
+        control = '<input class="input" id="' + id + '" name="' + f.key + '" ' +
+          'type="' + (f.type || 'text') + '" value="' + FS.esc(value) + '"' +
+          (f.required ? ' required' : '') +
+          (f.maxlength ? ' maxlength="' + f.maxlength + '"' : '') +
+          (f.min !== undefined ? ' min="' + f.min + '"' : '') +
+          (f.max !== undefined ? ' max="' + f.max + '"' : '') +
+          (f.step ? ' step="' + f.step + '"' : '') +
+          (f.uppercase ? ' style="text-transform:uppercase"' : '') + '>';
+      }
+
+      // A unit in front of the box, the same shape the catalog editor uses.
+      if (f.prefix) {
+        control = '<div class="row" style="gap:8px">' +
+          '<span class="text-dim text-sm">' + FS.esc(f.prefix) + '</span>' + control + '</div>';
+      }
+
+      return '<div class="field">' +
+        '<label class="label" for="' + id + '">' + FS.esc(f.label) +
+          (f.required ? ' <span class="req">*</span>' : '') + '</label>' +
+        control +
+        (f.hint ? '<p class="hint">' + FS.esc(f.hint) + '</p>' : '') +
+      '</div>';
+    }
+
+    /* --- Handing a technician a project --------------------------------
+       The other direction from Dash.assignModal: here the person is fixed and
+       the project is the thing being picked. Everything still open is listed,
+       unassigned first, because that is nearly always what is being handed
+       out. */
+    function assignProjectModal(p) {
+      if (!p || !p.refId) return;
+
+      var choices = Store.orders().filter(function (o) {
+        return o.mechanicId !== p.refId && o.status !== 'completed' && o.status !== 'canceled';
+      }).sort(function (a, b) {
+        return (a.mechanicId ? 1 : 0) - (b.mechanicId ? 1 : 0);
+      });
+
+      if (!choices.length) {
+        FS.modal({
+          title: 'Nothing to assign',
+          subtitle: p.name,
+          body: '<p class="text-muted">Every open project is already with this technician. ' +
+                'Completed and cancelled projects cannot be reassigned.</p>',
+          footer: '<button class="btn btn-primary" data-close>Close</button>'
+        });
+        return;
+      }
+
+      FS.modal({
+        title: 'Assign a project to ' + p.name,
+        subtitle: choices.length + ' project' + (choices.length === 1 ? '' : 's') + ' available',
+        size: 'lg',
+        body:
+          '<div class="stack" id="peProjects">' + choices.map(function (o) {
+            var c = Store.customer(o.customerId);
+            var held = o.mechanicId ? Store.mechanic(o.mechanicId) : null;
+            return '<label class="opt-card">' +
+              '<input type="radio" name="peProject" value="' + FS.esc(o.id) + '">' +
+              '<span style="flex:1 1 auto;min-width:0">' +
+                '<strong>' + FS.esc(o.id) + ' · ' + FS.esc(o.serviceType) + '</strong>' +
+                '<span>' + FS.esc(c ? c.company : 'Unknown customer') + ' · ' +
+                  FS.esc(o.city + ', ' + o.state) +
+                  (held ? ' · currently ' + FS.esc(held.name) : ' · unassigned') + '</span>' +
+              '</span>' +
+              Dash.statusBadge(o.status) +
+            '</label>';
+          }).join('') + '</div>' +
+          '<div class="alert alert--info mt-5">' + FS.icon('message') +
+            '<div>An SMS goes to the technician with the project ID, service type and location. ' +
+            'A project already with someone else is moved across.</div></div>',
+        footer:
+          '<button class="btn btn-outline" data-close>Cancel</button>' +
+          '<button class="btn btn-primary" id="peGive">Assign &amp; notify</button>',
+        onMount: function (root, close) {
+          root.querySelector('#peGive').addEventListener('click', function () {
+            var picked = root.querySelector('input[name="peProject"]:checked');
+            if (!picked) { FS.toast('Pick a project', 'Choose which project to hand over.', 'warn'); return; }
+            Store.assignMechanic(picked.value, p.refId, actor);
+            close();
+            FS.toast('Project assigned', picked.value + ' is now with ' + p.name + '.', 'ok');
+            render();
+            detailModal(Store.person(p.key));
+          });
+        }
+      });
     }
 
     /* --- Password reset ------------------------------------------------ */

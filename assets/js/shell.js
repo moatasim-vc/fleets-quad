@@ -40,6 +40,9 @@
           { view: 'industries',    label: 'Industries',    icon: 'building',    href: 'admin/industries.html' },
           { view: 'vehicles',      label: 'Vehicle Types', icon: 'truck',       href: 'admin/vehicles.html' },
           { view: 'blog',          label: 'Blog',          icon: 'edit',        href: 'admin/blog.html' },
+          // Same red treatment as the inbox: an unread application is somebody
+          // waiting on a reply, not a queue length.
+          { view: 'jobs',          label: 'Jobs',          icon: 'briefcase',   href: 'admin/jobs.html', count: 'applications', alert: true },
           { view: 'service-areas', label: 'Service Areas', icon: 'map',         href: 'admin/service-areas.html' },
           { view: 'reviews',       label: 'Reviews',       icon: 'review',      href: 'admin/reviews.html', count: 'pendingReviews' },
           { view: 'notifications', label: 'Notifications', icon: 'bell',        href: 'admin/notifications.html', count: 'unread' },
@@ -128,7 +131,8 @@
       orders: mine.filter(function (o) { return o.status !== 'completed' && o.status !== 'canceled'; }).length,
       unread: Store.unreadCount(role),
       pendingReviews: Store.reviews('pending').length,
-      messages: Store.inboxUnread()
+      messages: Store.inboxUnread(),
+      applications: Store.applicationsUnread()
     };
   }
 

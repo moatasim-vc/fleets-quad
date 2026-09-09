@@ -488,6 +488,63 @@
     { role: 'mechanic', name: 'Carlos Mendez',   email: 'mechanic@fleetsquad.com',   password: 'demo1234', home: 'mechanic/index.html', refId: 'MEC-01',    title: 'ASE Master Technician' }
   ];
 
+  /* The editable shape of an account, by role. Admin → Users builds its edit
+     form from this and the store writes the values straight onto the record,
+     so adding a field here is all it takes for it to appear and be saved.
+     `half` puts two fields on one row; `type` picks the control. */
+  D.personFields = {
+    customer: [
+      { key: 'firstName', label: 'First name', required: true, half: true },
+      { key: 'lastName',  label: 'Last name',  required: true, half: true },
+      { key: 'company',   label: 'Company',    required: true,
+        hint: 'The fleet account name shown on projects and invoices.' },
+      { key: 'email',     label: 'Email',      type: 'email', required: true, half: true,
+        hint: 'This is also the portal username.' },
+      { key: 'phone',     label: 'Phone',      type: 'tel', half: true },
+      { key: 'city',      label: 'City',       half: true },
+      { key: 'state',     label: 'State',      half: true, maxlength: 2, uppercase: true },
+      { key: 'zip',       label: 'ZIP',        half: true },
+      { key: 'fleetSize', label: 'Fleet size', type: 'number', half: true, min: 0,
+        hint: 'Vehicles on the account.' },
+      { key: 'status',    label: 'Account status', type: 'select',
+        options: ['active', 'paused', 'closed'] }
+    ],
+    mechanic: [
+      { key: 'name',       label: 'Full name', required: true },
+      { key: 'email',      label: 'Email',     type: 'email', required: true, half: true,
+        hint: 'This is also the portal username.' },
+      { key: 'phone',      label: 'Phone',     type: 'tel', half: true },
+      { key: 'certs',      label: 'Certifications',
+        hint: 'Shown under the name on the roster and the assign picker.' },
+      { key: 'city',       label: 'City',  half: true },
+      { key: 'state',      label: 'State', half: true, maxlength: 2, uppercase: true },
+      { key: 'hourlyRate', label: 'Hourly rate', type: 'number', half: true, min: 0,
+        prefix: '$', hint: 'What the technician is paid per hour.' },
+      { key: 'status',     label: 'Availability', type: 'select', half: true,
+        options: ['available', 'on-job', 'off-duty'] },
+      { key: 'rating',     label: 'Rating', type: 'number', half: true, min: 0, max: 5, step: '0.1',
+        hint: 'Out of 5. Normally follows the reviews.' },
+      { key: 'jobsDone',   label: 'Jobs completed', type: 'number', half: true, min: 0,
+        hint: 'Normally counted by the platform.' }
+    ],
+    manager: [
+      { key: 'name',     label: 'Full name', required: true },
+      { key: 'email',    label: 'Email', type: 'email', required: true, half: true,
+        hint: 'This is also the portal username.' },
+      { key: 'phone',    label: 'Phone', type: 'tel', half: true },
+      { key: 'region',   label: 'Region', type: 'select', options: ['East', 'Central', 'West'],
+        hint: 'Which book of projects this manager oversees.' },
+      { key: 'city',     label: 'City',  half: true },
+      { key: 'state',    label: 'State', half: true, maxlength: 2, uppercase: true }
+    ],
+    admin: [
+      { key: 'name',  label: 'Full name', required: true },
+      { key: 'email', label: 'Email', type: 'email', required: true, half: true,
+        hint: 'This is also the sign-in username.' },
+      { key: 'title', label: 'Job title', half: true }
+    ]
+  };
+
   /* ======================================================================
      Order lifecycle
      ====================================================================== */
@@ -1030,13 +1087,61 @@
   /* A stable id so the editor can address a row after the list is reordered. */
   D.partners.forEach(function (p, i) { p.id = p.id || 'PTR-' + (101 + i); });
 
+  /* Open roles on the careers page. Edited in Admin → Jobs, so each one needs
+     an id to be addressed by and a status deciding whether the public page
+     lists it at all. */
   D.jobs = [
-    { title: 'ASE Master Technician — Mobile',  dept: 'Field Operations', location: 'New York, NY',      type: 'Full-time', text: 'Run your own mobile service unit across our New York territory. ASE Master certification and five years of heavy-duty experience required.' },
-    { title: 'Diesel Technician',               dept: 'Field Operations', location: 'Dallas, TX',        type: 'Full-time', text: 'Class 6-8 diagnostics and repair at customer terminals. Aftertreatment and air brake experience essential.' },
-    { title: 'Fleet Service Manager',           dept: 'Operations',       location: 'Chicago, IL',       type: 'Full-time', text: 'Own the schedule, the quality and the customer relationship for a book of regional fleet accounts.' },
-    { title: 'Dispatch Coordinator (Overnight)',dept: 'Dispatch',         location: 'Remote (US)',       type: 'Full-time', text: 'Answer the 3am call. Route the closest qualified technician. Keep drivers informed.' },
-    { title: 'Mobile Inspector — DOT Certified',dept: 'Compliance',       location: 'Seattle, WA',       type: 'Full-time', text: 'Perform federal annual inspections at customer sites and maintain the compliance record.' },
-    { title: 'Field Operations Supervisor',     dept: 'Operations',       location: 'Phoenix, AZ',       type: 'Full-time', text: 'Lead a team of eight mobile technicians across the Phoenix metro service area.' }
+    { id: 'JOB-01', status: 'open',   posted: daysAgo(6),
+      title: 'ASE Master Technician — Mobile',   dept: 'Field Operations', location: 'New York, NY', type: 'Full-time',
+      text: 'Run your own mobile service unit across our New York territory. ASE Master certification and five years of heavy-duty experience required.' },
+    { id: 'JOB-02', status: 'open',   posted: daysAgo(11),
+      title: 'Diesel Technician',                dept: 'Field Operations', location: 'Dallas, TX', type: 'Full-time',
+      text: 'Class 6-8 diagnostics and repair at customer terminals. Aftertreatment and air brake experience essential.' },
+    { id: 'JOB-03', status: 'open',   posted: daysAgo(18),
+      title: 'Fleet Service Manager',            dept: 'Operations',       location: 'Chicago, IL', type: 'Full-time',
+      text: 'Own the schedule, the quality and the customer relationship for a book of regional fleet accounts.' },
+    { id: 'JOB-04', status: 'open',   posted: daysAgo(24),
+      title: 'Dispatch Coordinator (Overnight)', dept: 'Dispatch',         location: 'Remote (US)', type: 'Full-time',
+      text: 'Answer the 3am call. Route the closest qualified technician. Keep drivers informed.' },
+    { id: 'JOB-05', status: 'open',   posted: daysAgo(33),
+      title: 'Mobile Inspector — DOT Certified', dept: 'Compliance',       location: 'Seattle, WA', type: 'Full-time',
+      text: 'Perform federal annual inspections at customer sites and maintain the compliance record.' },
+    { id: 'JOB-06', status: 'open',   posted: daysAgo(40),
+      title: 'Field Operations Supervisor',      dept: 'Operations',       location: 'Phoenix, AZ', type: 'Full-time',
+      text: 'Lead a team of eight mobile technicians across the Phoenix metro service area.' },
+    /* A filled role. Kept on the list so the admin can reopen it rather than
+       retyping it, but off the public page. */
+    { id: 'JOB-07', status: 'closed', posted: daysAgo(96),
+      title: 'Parts Coordinator',                dept: 'Operations',       location: 'Atlanta, GA', type: 'Full-time',
+      text: 'Source and stage parts for the southeast service teams. Filled in March.' }
+  ];
+
+  /* The pickers on the job editor. Free text is still allowed — these are the
+     values already in use, offered so the cards stay consistent. */
+  D.jobDepartments = ['Field Operations', 'Operations', 'Dispatch', 'Compliance', 'Recruiting', 'Support'];
+  D.jobTypes = ['Full-time', 'Part-time', 'Contract', 'Temporary', 'Internship'];
+  D.jobStatuses = ['open', 'draft', 'closed'];
+
+  /* What the Apply form on the careers page collected. There is no mail server
+     behind the prototype, so an application is filed in this browser and read
+     in Admin → Jobs → Applications. */
+  D.applications = [
+    { id: 'APP-2001', at: daysAgo(0, 9),  read: false, jobId: 'JOB-01', jobTitle: 'ASE Master Technician — Mobile',
+      name: 'Ray Okonkwo', email: 'ray.okonkwo@gmail.com', phone: '(718) 555-0143',
+      certs: 'ASE Master, Diesel, Air Brakes',
+      why: 'Eleven years on Class 8 tractors, the last four running my own mobile unit for a leasing company. I would rather fix trucks at a yard than wait for them to be towed to one.' },
+    { id: 'APP-2002', at: daysAgo(1, 14), read: false, jobId: 'JOB-04', jobTitle: 'Dispatch Coordinator (Overnight)',
+      name: 'Marisol Vega', email: 'm.vega@outlook.com', phone: '(303) 555-0188',
+      certs: '',
+      why: 'Six years on an overnight towing desk. I am used to the 3am call and to drivers who need a straight answer about when someone is coming.' },
+    { id: 'APP-2003', at: daysAgo(3),   read: true,  jobId: 'JOB-02', jobTitle: 'Diesel Technician',
+      name: 'Curtis Lindqvist', email: 'clind@fastmail.com', phone: '(214) 555-0117',
+      certs: 'ASE Diesel, Aftertreatment',
+      why: 'Currently at a Dallas terminal doing the same work indoors. Looking for the van and the territory.' },
+    { id: 'APP-2004', at: daysAgo(8),   read: true,  jobId: 'JOB-01', jobTitle: 'ASE Master Technician — Mobile',
+      name: 'Beatrice Hollins', email: 'bea.hollins@gmail.com', phone: '(917) 555-0166',
+      certs: 'ASE Master, HVAC',
+      why: 'Fifteen years heavy-duty, five of them training apprentices. Happy to take the New York territory and mentor whoever comes next.' }
   ];
 
   D.timelineValues = [

@@ -29,6 +29,9 @@
 
     return {
       orders:        clone(FS.data.orders),
+      // The sign-in accounts live in the state too, so an admin can edit their
+      // own record the same way as everybody else's.
+      users:         clone(FS.data.users),
       customers:     clone(FS.data.customers),
       mechanics:     clone(FS.data.mechanics),
       managers:      clone(FS.data.managers),
@@ -45,6 +48,8 @@
       vehicleTypes:  clone(FS.data.vehicleTypes),
       faqs:          clone(FS.data.faqs),
       inbox:         clone(FS.data.inbox),
+      jobs:          clone(FS.data.jobs),
+      applications:  clone(FS.data.applications),
       credentials:   credentials,
       settings:      { stripe: {}, stripeMode: 'test', stripeConnected: false },
       estimates:     [],
@@ -53,6 +58,8 @@
       nextProject:   1233,
       nextCustomer:  1009,
       nextMessage:   1005,
+      nextJob:       8,
+      nextApplication: 2005,
       seedVersion:   SEED_VERSION
     };
   }
@@ -155,7 +162,7 @@
        ---------------------------------------------------------------------- */
 
     login: function (role) {
-      var user = FS.data.users.filter(function (u) { return u.role === role; })[0];
+      var user = Store.users().filter(function (u) { return u.role === role; })[0];
       if (!user) return null;
       state.session = { role: user.role, name: user.name, email: user.email, refId: user.refId, title: user.title };
       state.impersonator = null;
@@ -243,7 +250,7 @@
     directory: function (type) {
       var list = [];
 
-      FS.data.users.filter(function (u) { return u.role === 'admin'; }).forEach(function (u) {
+      Store.users().filter(function (u) { return u.role === 'admin'; }).forEach(function (u) {
         list.push({
           key: 'ADM-' + u.email, role: 'admin', type: 'Admin', name: u.name, email: u.email,
           phone: '(888) 391-6324', city: 'New York', state: 'NY', company: 'FleetSquad',
@@ -285,6 +292,82 @@
 
     person: function (key) {
       return Store.directory().filter(function (p) { return p.key === key; })[0] || null;
+    },
+
+    users: function () { return state.users || FS.data.users; },
+
+    /**
+     * The record behind a directory key, and which collection it came from.
+     * The four kinds of account are stored in four different shapes, so
+     * anything that edits a person resolves it here rather than guessing.
+     * @returns {{role:string, person:object, record:object}|null}
+     */
+    personRecord: function (key) {
+      var p = Store.person(key);
+      if (!p) return null;
+      var record =
+        p.role === 'admin'    ? Store.users().filter(function (u) { return 'ADM-' + u.email === key; })[0] :
+        p.role === 'manager'  ? Store.manager(p.refId) :
+        p.role === 'mechanic' ? Store.mechanic(p.refId) :
+                                Store.customer(p.refId);
+      return record ? { role: p.role, person: p, record: record } : null;
+    },
+
+    /**
+     * Write an edited account back to whichever collection holds it. The form
+     * is built from FS.data.personFields, so the patch is already in the
+     * record's own field names and can be applied as it stands.
+     * @returns {{ok:boolean, error?:string, person?:object}}
+     */
+    savePerson: function (key, patch) {
+      var found = Store.personRecord(key);
+      if (!found) return { ok: false, error: 'That account no longer exists.' };
+
+      var record = found.record;
+      var oldEmail = String(record.email || '').toLowerCase();
+      var email = patch.email === undefined ? record.email : String(patch.email).trim();
+      if (!email) return { ok: false, error: 'An email address is needed — it is also the portal username.' };
+
+      // Two accounts on one address would make signing in ambiguous.
+      var clash = Store.directory().filter(function (p) {
+        return p.key !== key && String(p.email).toLowerCase() === email.toLowerCase();
+      })[0];
+      if (clash) return { ok: false, error: clash.name + ' already signs in with that address.' };
+
+      // Number fields arrive from the form as strings; a blank one is left as
+      // it was rather than written as NaN.
+      (FS.data.personFields[found.role] || []).forEach(function (f) {
+        if (f.type !== 'number' || patch[f.key] === undefined) return;
+        if (String(patch[f.key]).trim() === '') delete patch[f.key];
+        else patch[f.key] = Number(patch[f.key]);
+      });
+
+      Object.assign(record, patch, { email: email });
+
+      /* The password is filed under the address, so a changed email has to
+         take the credential with it or the account cannot sign in again. */
+      if (oldEmail && oldEmail !== email.toLowerCase()) {
+        state.credentials[email.toLowerCase()] = state.credentials[oldEmail] || 'demo1234';
+        delete state.credentials[oldEmail];
+      }
+
+      /* Whoever is signed in may be the person just edited — or may be
+         impersonating them — so the topbar has to follow the change. */
+      var after = Store.person(found.role === 'admin' ? 'ADM-' + email : key);
+      if (after) {
+        [state.session, state.impersonator].forEach(function (s) {
+          if (!s) return;
+          var same = (after.refId && s.refId === after.refId) ||
+                     (oldEmail && String(s.email || '').toLowerCase() === oldEmail);
+          if (!same) return;
+          s.name = after.name;
+          s.email = after.email;
+          s.title = after.title;
+        });
+      }
+
+      Store.lastWriteOk = persist();
+      return { ok: true, person: after };
     },
 
     /**
@@ -1011,6 +1094,117 @@
 
     deleteMessage: function (id) {
       state.inbox = state.inbox.filter(function (m) { return m.id !== id; });
+      persist();
+    },
+
+    /* ----------------------------------------------------------------------
+       Careers — open roles and the applications they attract
+       The roles drive the public careers page and are edited in Admin → Jobs.
+       An application is what the Apply form on that page collected: there is
+       no mail server behind the prototype, so it is filed in this browser and
+       read in Admin → Jobs → Applications.
+       ---------------------------------------------------------------------- */
+
+    /** @param {string} [status] 'open' | 'draft' | 'closed'. Omit for all. */
+    jobs: function (status) {
+      var list = state.jobs || [];
+      return status ? list.filter(function (j) { return j.status === status; }) : list;
+    },
+
+    job: function (id) {
+      return (state.jobs || []).filter(function (j) { return j.id === id; })[0] || null;
+    },
+
+    saveJob: function (id, patch) {
+      var j = Store.job(id);
+      if (!j) return null;
+      Object.assign(j, patch);
+      Store.lastWriteOk = persist();
+      return j;
+    },
+
+    /** Append a blank role, ready to edit. New roles start as a draft so a
+        half-written posting never appears on the public page. */
+    createJob: function () {
+      var n = state.nextJob || ((state.jobs || []).length + 1);
+      state.nextJob = n + 1;
+      var job = {
+        id: 'JOB-' + (n < 10 ? '0' : '') + n,
+        status: 'draft',
+        posted: new Date().toISOString(),
+        title: 'New role',
+        dept: FS.data.jobDepartments[0],
+        location: '',
+        type: FS.data.jobTypes[0],
+        text: ''
+      };
+      state.jobs.push(job);
+      Store.lastWriteOk = persist();
+      return job;
+    },
+
+    deleteJob: function (id) {
+      state.jobs = (state.jobs || []).filter(function (j) { return j.id !== id; });
+      persist();
+    },
+
+    /** Move a role up or down. The order here is the order on the page. */
+    moveJob: function (id, by) {
+      var list = state.jobs || [];
+      var i = list.map(function (j) { return j.id; }).indexOf(id);
+      var to = i + by;
+      if (i < 0 || to < 0 || to >= list.length) return false;
+      list.splice(to, 0, list.splice(i, 1)[0]);
+      persist();
+      return true;
+    },
+
+    /** Newest application first, which is the order the admin reads them in. */
+    applications: function (jobId) {
+      var list = (state.applications || []).slice().sort(function (a, b) {
+        return new Date(b.at) - new Date(a.at);
+      });
+      return jobId ? list.filter(function (a) { return a.jobId === jobId; }) : list;
+    },
+
+    application: function (id) {
+      return (state.applications || []).filter(function (a) { return a.id === id; })[0] || null;
+    },
+
+    applicationsUnread: function () {
+      return (state.applications || []).filter(function (a) { return !a.read; }).length;
+    },
+
+    /** File what the Apply form collected. Returns the stored application. */
+    addApplication: function (payload) {
+      var job = payload.jobId ? Store.job(payload.jobId) : null;
+      var app = Object.assign({
+        id: 'APP-' + (state.nextApplication || 2005),
+        at: new Date().toISOString(),
+        read: false,
+        jobTitle: job ? job.title : (payload.jobTitle || 'General application')
+      }, payload);
+      state.nextApplication = (state.nextApplication || 2005) + 1;
+      state.applications.unshift(app);
+      Store.lastWriteOk = persist();
+      return app;
+    },
+
+    markApplicationRead: function (id, read) {
+      var a = Store.application(id);
+      if (!a) return null;
+      a.read = read === undefined ? true : !!read;
+      persist();
+      return a;
+    },
+
+    markAllApplicationsRead: function () {
+      (state.applications || []).forEach(function (a) { a.read = true; });
+      persist();
+    },
+
+    deleteApplication: function (id) {
+      state.applications = (state.applications || []).filter(function (a) { return a.id !== id; });
       persist();
     },
 

@@ -754,23 +754,35 @@
 
   function careersPage() {
     applyCmsPage('careers');
+    // Roles come from the store, so anything added, edited, closed or reordered
+    // in Admin → Jobs shows here on the next load. Drafts and filled roles are
+    // held back — only what is open is advertised.
+    var jobs = Store.jobs('open');
     body.innerHTML =
-      section(headBlock('Open roles', D.jobs.length + ' positions across our field, dispatch and operations teams.') +
-        '<div class="stack">' + D.jobs.map(function (j) {
-          return '<div class="card card-pad">' +
-            '<div class="row-between row-wrap" style="gap:var(--sp-4)">' +
-              '<div style="flex:1 1 320px;min-width:0">' +
-                '<h3 class="mb-2">' + FS.esc(j.title) + '</h3>' +
-                '<div class="row row-wrap mb-3" style="gap:8px">' +
-                  '<span class="chip">' + FS.icon('briefcase') + FS.esc(j.dept) + '</span>' +
-                  '<span class="chip">' + FS.icon('map-pin') + FS.esc(j.location) + '</span>' +
-                  '<span class="chip chip--active">' + FS.esc(j.type) + '</span>' +
-                '</div>' +
-                '<p class="text-muted text-sm mb-0">' + FS.esc(j.text) + '</p>' +
-              '</div>' +
-              '<button class="btn btn-primary" data-apply="' + FS.esc(j.title) + '">Apply now</button>' +
-            '</div></div>';
-        }).join('') + '</div>') +
+      section(headBlock('Open roles', jobs.length
+          ? jobs.length + ' position' + (jobs.length === 1 ? '' : 's') +
+            ' across our field, dispatch and operations teams.'
+          : 'Nothing open right now — but we are always glad to hear from good technicians.') +
+        (jobs.length
+          ? '<div class="stack">' + jobs.map(function (j) {
+              return '<div class="card card-pad">' +
+                '<div class="row-between row-wrap" style="gap:var(--sp-4)">' +
+                  '<div style="flex:1 1 320px;min-width:0">' +
+                    '<h3 class="mb-2">' + FS.esc(j.title) + '</h3>' +
+                    '<div class="row row-wrap mb-3" style="gap:8px">' +
+                      '<span class="chip">' + FS.icon('briefcase') + FS.esc(j.dept) + '</span>' +
+                      '<span class="chip">' + FS.icon('map-pin') + FS.esc(j.location) + '</span>' +
+                      '<span class="chip chip--active">' + FS.esc(j.type) + '</span>' +
+                    '</div>' +
+                    '<p class="text-muted text-sm mb-0">' + FS.esc(j.text) + '</p>' +
+                  '</div>' +
+                  '<button class="btn btn-primary" data-apply="' + FS.esc(j.id) + '">Apply now</button>' +
+                '</div></div>';
+            }).join('') + '</div>'
+          : '<div class="empty-state">' + FS.icon('briefcase') +
+            '<h4>No open roles today</h4>' +
+            '<p>New positions are posted here first. Send us a note and we will keep you in mind.</p>' +
+            '<a class="btn btn-primary mt-5" href="' + FS.url('pages/contact.html') + '">Get in touch</a></div>')) +
 
       section(headBlock('What we offer') + featureGrid([
         { icon: 'wallet', title: 'Competitive pay', text: 'Above-market hourly rates plus completion bonuses.' },
@@ -783,8 +795,10 @@
     body.addEventListener('click', function (e) {
       var btn = e.target.closest('[data-apply]');
       if (!btn) return;
+      var job = Store.job(btn.dataset.apply);
+      if (!job) return;
       FS.modal({
-        title: 'Apply: ' + btn.dataset.apply,
+        title: 'Apply: ' + job.title,
         subtitle: 'We reply to every application within five business days.',
         body:
           '<form id="applyForm" novalidate>' +
@@ -799,8 +813,19 @@
         footer: '<button class="btn btn-outline" data-close>Cancel</button><button class="btn btn-primary" id="apSend">Send application</button>',
         onMount: function (root, close) {
           root.querySelector('#apSend').addEventListener('click', function () {
-            if (!FS.validate(root.querySelector('#applyForm'))) return;
+            var form = root.querySelector('#applyForm');
+            if (!FS.validate(form)) return;
+            /* No recruiting mailbox behind the prototype: the application is
+               filed in this browser against the role and read by the admin in
+               Jobs → Applications. */
+            var payload = FS.formData(form);
+            payload.jobId = job.id;
+            Store.addApplication(payload);
             close();
+            if (Store.lastWriteOk === false) {
+              FS.toast('Application sent', 'Held for this visit only — this browser refused to store it.', 'warn');
+              return;
+            }
             FS.toast('Application sent', 'Our recruiting team will be in touch.', 'ok');
           });
         }
@@ -837,9 +862,9 @@
               '<div class="field"><label class="label" for="cMsg">Message <span class="req">*</span></label>' +
                 '<textarea class="textarea" id="cMsg" name="message" required></textarea></div>' +
               '<button class="btn btn-primary btn-block" type="submit">Send message' + FS.icon('send') + '</button>' +
-              '<p class="text-xs text-dim text-center mt-3 mb-0">Goes to ' +
-                '<a href="mailto:' + FS.esc(C.contactEmail) + '">' + FS.esc(C.contactEmail) + '</a>' +
-                ' — or write to us there directly.</p>' +
+              // '<p class="text-xs text-dim text-center mt-3 mb-0">Goes to ' +
+              //   '<a href="mailto:' + FS.esc(C.contactEmail) + '">' + FS.esc(C.contactEmail) + '</a>' +
+              //   ' — or write to us there directly.</p>' +
             '</form>' +
           '</div></div>' +
           '<div class="stack">' +
