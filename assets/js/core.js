@@ -498,12 +498,96 @@
       }, 8000);
     }
 
+    /* --- voice selection ---------------------------------------------
+       The voices are the reader's own — nothing is shipped with the site — so
+       which ones exist differs across Windows, macOS, iOS, Android and every
+       browser on them. The pick is therefore a preference, not a name: each
+       installed English voice is scored and the best one wins.
+
+       TOP is ordered best-first. The neural engines Edge exposes sound far
+       closer to a person than the older formant voices, so they lead; then
+       Chrome's own bundled female voices, then the macOS and Windows staples.
+       A voice that is only recognisably female scores below all of those but
+       above an unknown one, and a recognisably male voice is passed over
+       entirely rather than being read as a weak match. */
+    var TOP = [
+      /microsoft (aria|jenny|michelle|emma|ava|sonia|libby)\b.*(natural|neural)/i,
+      /\b(aria|jenny|michelle|emma|sonia|libby)neural\b/i,
+      /google us english/i,
+      /google uk english female/i,
+      /\b(samantha|ava|allison|susan|zoe)\b/i,
+      /microsoft (zira|hazel|susan|linda|catherine)\b/i,
+      /\b(serena|karen|moira|tessa|fiona|veena)\b/i
+    ];
+    var FEMALE = /\b(female|woman|girl|aria|jenny|michelle|ana|zira|hazel|susan|samantha|ava|allison|joanna|salli|kendra|kimberly|nicole|karen|serena|moira|tessa|fiona|catherine|emily|amy|emma|olivia|sophia)\b/i;
+    var MALE = /\b(male|man|david|mark|guy|george|james|ryan|alex|daniel|fred|tom|oliver|william|arthur|rishi|brandon|christopher|eric|roger|steffan)\b/i;
+    /* macOS novelty and low-bitrate fallbacks — intelligible, but not a voice
+       to put in front of a customer. */
+    var POOR = /(compact|eloquence|espeak|pico|novelty|bells|bubbles|cellos|organ|zarvox|trinoids|whisper|bad news|good news)/i;
+
+    var voices = [];
+    var chosen = null;
+
+    function score(v) {
+      var lang = String(v.lang || '').toLowerCase().replace('_', '-');
+      if (lang.indexOf('en') !== 0) return -1;      /* English only */
+      var name = String(v.name || '');
+      var n = 0;
+      for (var i = 0; i < TOP.length; i++) {
+        if (TOP[i].test(name)) { n = (TOP.length - i) * 10; break; }
+      }
+      if (!n && MALE.test(name)) return -1;         /* never settle for a male voice */
+      if (!n) n = FEMALE.test(name) ? 5 : 1;        /* known female, else unknown */
+      if (/natural|neural|premium|enhanced/i.test(name)) n += 4;
+      if (POOR.test(name)) n -= 6;
+      /* Tie-break on region so an en-GB page is not read in an American accent
+         when both are installed. The pages carry a bare lang="en", and this is
+         a US company throughout — states, DOT inspections, a US phone number —
+         so an unqualified "en" is treated as en-US rather than left open. */
+      var want = String(document.documentElement.lang || '').toLowerCase();
+      var region = want.split('-')[1] || 'us';
+      if (region && lang.indexOf('-' + region) > -1) n += 2;
+      return n;
+    }
+
+    function refreshVoices() {
+      voices = (ok && synth.getVoices()) || [];
+      var best = null, bestScore = 0;
+      voices.forEach(function (v) {
+        var n = score(v);
+        if (n > bestScore) { bestScore = n; best = v; }
+      });
+      chosen = best;
+    }
+
+    /* Chrome returns an empty list on the first call and fills it in later,
+       so the pick is made again whenever the browser says it has changed. */
+    if (ok) {
+      refreshVoices();
+      if (typeof synth.addEventListener === 'function') {
+        synth.addEventListener('voiceschanged', refreshVoices);
+      } else {
+        synth.onvoiceschanged = refreshVoices;
+      }
+    }
+
+    function voice() {
+      if (!chosen) refreshVoices();
+      return chosen;
+    }
+
     function speakNext() {
       if (at >= queue.length) { stop(); return; }
       var u = new window.SpeechSynthesisUtterance(queue[at]);
-      u.rate = 1;
+      var v = voice();
+      /* A shade under conversational pace — an article read at a flat 1 runs
+         faster than someone presenting it would. */
+      u.rate = 0.97;
       u.pitch = 1;
-      u.lang = document.documentElement.lang || 'en-US';
+      /* The language has to travel with the voice: leaving a stale lang on the
+         utterance makes some engines quietly ignore the voice and fall back. */
+      if (v) { u.voice = v; u.lang = v.lang; }
+      else { u.lang = document.documentElement.lang || 'en-US'; }
       u.onend = function () { at++; speakNext(); };
       u.onerror = function () { stop(); };
       synth.speak(u);
@@ -535,6 +619,8 @@
 
     return {
       supported: function () { return ok; },
+      /** The voice being used, or null while the browser is still listing them. */
+      voiceName: function () { var v = voice(); return v ? v.name + ' (' + v.lang + ')' : null; },
       state: function () { return status; },
       onChange: function (fn) { listeners.push(fn); return fn; },
       offChange: function (fn) {
