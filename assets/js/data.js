@@ -1036,6 +1036,11 @@
     ]
   };
 
+  /* The Google "Share → Embed a map" link for the listing FleetSquad works out
+     of. Shipped as the default only: the admin owns it from the first save, so
+     the day a dedicated office opens it is changed in the CMS, not here. */
+  var MAP_EMBED = 'https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d2834.640318107858!2d-93.20956592306005!3d44.72695178232522!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x87f637de06f4dea1%3A0x2e0c9b408b3b3372!2sMobile%20Mechanic%20of%20Apple%20Valley!5e0!3m2!1sen!2sus!4v1788795151316!5m2!1sen!2sus';
+
   /* Attach the bodies to their page records, and give Contact its map. The
      map is a plain Google embed — no API key, no account, nothing to bill. */
   D.cmsPages.forEach(function (p) {
@@ -1044,8 +1049,11 @@
   });
   D.cmsPages.forEach(function (p) {
     if (p.slug !== 'contact') return;
-    p.mapAddress = 'New York, NY';
-    p.mapEmbed = '';
+    /* The listing FleetSquad trades from today. Both are editable in
+       Admin → CMS Pages → Contact Us: the embed wins while it is set, and
+       clearing it falls the map back to the address below. */
+    p.mapAddress = 'Mobile Mechanic of Apple Valley, MN';
+    p.mapEmbed = MAP_EMBED;
     p.mapLabel = 'Where we are';
   });
 

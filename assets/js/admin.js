@@ -2149,7 +2149,7 @@
               var url = src();
               preview.innerHTML = url
                 ? '<iframe src="' + FS.esc(url) + '" title="Map preview" loading="lazy" ' +
-                  'referrerpolicy="no-referrer-when-downgrade"></iframe>'
+                  'referrerpolicy="strict-origin-when-cross-origin"></iframe>'
                 : '<span class="map-empty">' + FS.icon('map-pin') +
                   (embed.value.trim() ? 'That is not a Google Maps link' : 'No map on the page') + '</span>';
               FS.hydrateIcons(preview);

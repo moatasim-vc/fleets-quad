@@ -67,7 +67,7 @@
   /* Bumped when the shipped data changes in a way a saved state must pick up.
      Anything not listed in migrate() below is left exactly as the user left
      it — this is deliberately narrow, not a reset. */
-  var SEED_VERSION = 3;
+  var SEED_VERSION = 5;
 
   /**
    * Fold new shipped data into a state that was saved by an earlier build.
@@ -102,6 +102,30 @@
       var mine = saved.cmsPages.filter(function (p) { return p.slug === f.slug; })[0];
       if (!mine) saved.cmsPages.push(f);
     });
+
+    // v5: Contact ships the real Google listing instead of the New York
+    // placeholder it was built against, and Service Areas now draws the same
+    // record beside its area check.
+    //
+    // v4 tried this but only matched a record still reading exactly
+    // 'New York, NY', so a state whose map was blank — saved before the fields
+    // existed, or cleared since — was skipped and then stamped v4, which put it
+    // permanently out of reach. Hence the re-run at v5 and the wider test: a
+    // record counts as untouched when no embed is set and the address is either
+    // blank or that placeholder. Anything the admin actually typed is theirs and
+    // is left exactly as it is.
+    if (!(was >= 5)) {
+      var freshContact = fresh.cmsPages.filter(function (p) { return p.slug === 'contact'; })[0];
+      var myContact = saved.cmsPages.filter(function (p) { return p.slug === 'contact'; })[0];
+      var myAddr = String((myContact && myContact.mapAddress) || '').trim();
+      if (freshContact && myContact &&
+          !String(myContact.mapEmbed || '').trim() &&
+          (!myAddr || myAddr === 'New York, NY')) {
+        myContact.mapAddress = freshContact.mapAddress;
+        myContact.mapEmbed = freshContact.mapEmbed;
+        myContact.mapLabel = myContact.mapLabel || freshContact.mapLabel;
+      }
+    }
 
     saved.seedVersion = SEED_VERSION;
   }

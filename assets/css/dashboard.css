@@ -365,23 +365,8 @@ body.sidebar-open .sidebar-scrim { opacity: 1; visibility: visible; }
 .note-body p { margin: 3px 0 0; font-size: var(--fs-sm); color: var(--ink-500); white-space: pre-line; }
 .note-time { flex: none; font-size: var(--fs-xs); color: var(--ink-400); white-space: nowrap; }
 
-/* Simulated SMS/email preview */
-.msg-preview {
-  border: 1px solid var(--line);
-  border-radius: var(--r-md);
-  overflow: hidden;
-  font-size: var(--fs-sm);
-}
-.msg-preview-head {
-  padding: 9px 14px;
-  background: var(--surface-2);
-  border-bottom: 1px solid var(--line-soft);
-  font-weight: 700;
-  color: var(--ink-600);
-  display: flex; align-items: center; gap: 8px;
-}
-.msg-preview-head svg { width: 15px; height: 15px; }
-.msg-preview-body { padding: 14px; white-space: pre-line; color: var(--ink-700); line-height: 1.6; background: var(--surface); }
+/* The simulated SMS/email preview moved to components.css: the login page
+   raises one from its password-reset modal and never loads this sheet. */
 
 /* Credentials block shown after New Sale */
 .creds {

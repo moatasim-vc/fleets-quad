@@ -197,7 +197,7 @@
       headBlock(label) +
       '<div class="map-embed">' +
         '<iframe src="' + FS.esc(src) + '" title="FleetSquad on Google Maps" ' +
-          'loading="lazy" referrerpolicy="no-referrer-when-downgrade" allowfullscreen></iframe>' +
+          'loading="lazy" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>' +
       '</div>', '', 'padding-top:0');
   }
 
@@ -319,7 +319,7 @@
     body.innerHTML =
       section('<div class="grid grid-3">' + Store.catalog('industry').map(function (i) {
         return '<a class="tile" href="' + FS.url('industry.html?i=' + i.slug) + '">' +
-          '<span class="kpi-icon kpi-icon--navy mb-3">' + FS.icon(i.icon) + '</span>' +
+          '<span class="tile-ico tile-ico--navy mb-3">' + FS.icon(i.icon) + '</span>' +
           '<h3>' + FS.esc(i.name) + '</h3><p>' + FS.esc(i.excerpt) + '</p>' +
           '<span class="tile-link">Explore' + FS.icon('arrow-right') + '</span></a>';
       }).join('') + '</div>') + ctaBlock();
@@ -342,8 +342,8 @@
 
     body.innerHTML =
       section('<div class="grid grid-3">' + i.stats.map(function (s) {
-        return '<div class="kpi text-center"><div class="kpi-value" style="font-size:2.2rem">' + FS.esc(s.v) + '</div>' +
-          '<div class="kpi-label mt-2">' + FS.esc(s.l) + '</div></div>';
+        return '<div class="stat-tile"><div class="stat-tile-value">' + FS.esc(s.v) + '</div>' +
+          '<div class="stat-tile-label">' + FS.esc(s.l) + '</div></div>';
       }).join('') + '</div>') +
 
       /* One column. The "Popular services" card that used to sit beside this
@@ -408,7 +408,7 @@
       section(headBlock('Services for ' + v.name.toLowerCase()) +
         '<div class="grid grid-3">' + Store.catalog('service').slice(0, 6).map(function (s) {
           return '<a class="tile" href="' + FS.url('service.html?s=' + s.slug) + '">' +
-            '<span class="kpi-icon mb-3">' + FS.icon(s.icon) + '</span>' +
+            '<span class="tile-ico mb-3">' + FS.icon(s.icon) + '</span>' +
             '<h3>' + FS.esc(s.short) + '</h3><p>' + FS.esc(s.excerpt) + '</p>' +
             '<span class="tile-link">Learn more' + FS.icon('arrow-right') + '</span></a>';
         }).join('') + '</div>', '', 'padding-top:0;background:var(--surface-2)') +
@@ -478,9 +478,9 @@
     setHero(p.title, p.excerpt,
       [{ label: 'Home', href: 'index.html' }, { label: 'Blog', href: 'blog.html' }, { label: p.category }],
       '<div class="row row-wrap mt-6" style="gap:var(--sp-5);color:rgba(255,255,255,.8);font-size:var(--fs-sm)">' +
-        '<span class="row" style="gap:8px">' + FS.icon('user') + FS.esc(p.author) + '</span>' +
-        '<span class="row" style="gap:8px">' + FS.icon('calendar') + FS.date(p.at, 'long') + '</span>' +
-        '<span class="row" style="gap:8px">' + FS.icon('clock') + p.read + ' min read</span>' +
+        '<span class="hero-meta">' + FS.icon('user') + FS.esc(p.author) + '</span>' +
+        '<span class="hero-meta">' + FS.icon('calendar') + FS.date(p.at, 'long') + '</span>' +
+        '<span class="hero-meta">' + FS.icon('clock') + p.read + ' min read</span>' +
         // Sits in the royal-blue hero, immediately after the read time. One
         // control only — it cycles Voice / Pause / Resume, and the separate
         // stop button beside it was removed at the client's request.
@@ -941,25 +941,41 @@
       path: page.path || 'service-areas/'
     });
 
+    var areaMapSrc = mapSrc(Store.cmsPage('contact'));
+    var areaCheckCard =
+      '<div class="card card-pad">' +
+        '<h3 class="mb-2">Check if we are in your area</h3>' +
+        '<p class="text-muted text-sm mb-4">Enter a city, county or state.</p>' +
+        '<form id="areaCheck" class="row" style="gap:var(--sp-3);flex-wrap:nowrap" novalidate>' +
+          '<div class="input-icon" style="flex:1 1 auto">' + FS.icon('map-pin') +
+          '<input class="input" id="areaInput" placeholder="Dallas, Maricopa, Georgia…" aria-label="Your city, county or state"></div>' +
+          '<button class="btn btn-primary" type="submit">Check</button>' +
+        '</form>' +
+        '<div id="areaResult" role="status"></div>' +
+      '</div>';
+
     body.innerHTML =
       section(
         '<div class="grid grid-3 mb-8">' +
-          kpi(covered.length, 'States covered') +
-          kpi(counties, 'Counties served') +
-          kpi(cities, 'Cities and metros') +
+          statTile(covered.length, 'States covered') +
+          statTile(counties, 'Counties served') +
+          statTile(cities, 'Cities and metros') +
         '</div>' +
 
-        /* Check-your-area box — the same lookup the homepage zip widget uses. */
-        '<div class="card card-pad mb-8" style="max-width:560px;margin-inline:auto">' +
-          '<h3 class="mb-2">Check if we are in your area</h3>' +
-          '<p class="text-muted text-sm mb-4">Enter a city, county or state.</p>' +
-          '<form id="areaCheck" class="row" style="gap:var(--sp-3);flex-wrap:nowrap" novalidate>' +
-            '<div class="input-icon" style="flex:1 1 auto">' + FS.icon('map-pin') +
-            '<input class="input" id="areaInput" placeholder="Dallas, Maricopa, Georgia…" aria-label="Your city, county or state"></div>' +
-            '<button class="btn btn-primary" type="submit">Check</button>' +
-          '</form>' +
-          '<div id="areaResult" role="status"></div>' +
-        '</div>' +
+        /* Check-your-area box — the same lookup the homepage zip widget uses —
+           with the Google listing beside it. The map is the contact page's own
+           record, so moving office stays one edit in Admin → CMS Pages →
+           Contact Us. Clear the map there and this falls back to the single
+           centred column the box had before. */
+        (areaMapSrc
+          ? '<div class="split split--1-1 mb-8" style="align-items:stretch">' +
+              areaCheckCard +
+              '<div class="map-embed map-embed--panel">' +
+                '<iframe src="' + FS.esc(areaMapSrc) + '" title="FleetSquad on Google Maps" ' +
+                  'loading="lazy" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>' +
+              '</div>' +
+            '</div>'
+          : '<div class="mb-8" style="max-width:560px;margin-inline:auto">' + areaCheckCard + '</div>') +
 
         '<div class="coverage-map card card-pad mb-8">' +
           '<div class="row-between row-wrap mb-5" style="gap:var(--sp-4)">' +
@@ -993,9 +1009,9 @@
     wireCheck();
     wireMap();
 
-    function kpi(value, label) {
-      return '<div class="kpi text-center"><div class="kpi-value" style="font-size:2.2rem">' + value + '</div>' +
-        '<div class="kpi-label mt-2">' + label + '</div></div>';
+    function statTile(value, label) {
+      return '<div class="stat-tile"><div class="stat-tile-value">' + value + '</div>' +
+        '<div class="stat-tile-label">' + label + '</div></div>';
     }
 
     /* Highlight the matching state card and say what was matched. */

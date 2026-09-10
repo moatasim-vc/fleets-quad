@@ -557,12 +557,10 @@ body.drawer-open .drawer { transform: translateX(0); }
     position: absolute;
     top: 16px; left: 16px;
     width: 56px; height: 56px;
-    border-radius: 14px;
-    background: var(--blue-600);
+    border-radius: 17px;
     align-items: center; justify-content: center;
-    box-shadow: 0 4px 14px rgba(3, 24, 62, .3);
   }
-  .svc-icon svg { width: 30px; height: 30px; color: #fff; }
+  .svc-icon svg { width: 29px; height: 29px; }
   .svc-media--empty > svg { width: 46px; height: 46px; }
   .svc-body { padding: 24px 26px 28px; }
   .svc-body h3 { font-size: 22px; margin-bottom: 12px; }
@@ -846,14 +844,8 @@ body.drawer-open .drawer { transform: translateX(0); }
   border: 1px solid var(--line);
   border-radius: var(--r-lg);
 }
-.feature i {
-  width: 46px; height: 46px;
-  flex: none;
-  border-radius: var(--r-md);
-  background: var(--blue-050);
-  display: flex; align-items: center; justify-content: center;
-}
-.feature i svg { width: 23px; height: 23px; color: var(--blue-600); }
+/* The icon plate itself is drawn by the inner-page icon system at the foot of
+   this file, so .feature only owns the row around it. */
 .feature h4 { margin-bottom: 5px; font-size: var(--fs-md); }
 .feature p { font-size: var(--fs-base); color: var(--ink-500); margin: 0; }
 
@@ -1038,8 +1030,7 @@ body.drawer-open .drawer { transform: translateX(0); }
   font-weight: 700;
   color: var(--ink-900);
 }
-.faq-q svg { width: 20px; height: 20px; flex: none; color: var(--blue-600); transition: transform var(--transition); }
-.faq-item.is-open .faq-q svg { transform: rotate(45deg); }
+/* The open/close glyph is a badge drawn by the inner-page icon system below. */
 .faq-a { display: none; padding-bottom: var(--sp-5); color: var(--ink-500); max-width: 76ch; }
 .faq-item.is-open .faq-a { display: block; }
 
@@ -1160,13 +1151,11 @@ body.drawer-open .drawer { transform: translateX(0); }
   display: flex;
   position: absolute;
   top: 14px; left: 14px;
-  width: 50px; height: 50px;
-  border-radius: 13px;
-  background: var(--blue-600);
+  width: 52px; height: 52px;
+  border-radius: 16px;
   align-items: center; justify-content: center;
-  box-shadow: 0 4px 14px rgba(3, 24, 62, .3);
 }
-.svc-card--full .svc-icon svg { width: 27px; height: 27px; color: #fff; }
+.svc-card--full .svc-icon svg { width: 27px; height: 27px; }
 .svc-card--full .svc-body { padding: 22px 24px 26px; }
 .svc-card--full .svc-body h3 { font-size: 20px; margin-bottom: 10px; }
 .svc-card--full .svc-desc { display: block; color: var(--ink-500); font-size: var(--fs-md); line-height: 1.6; margin-bottom: 14px; }
@@ -1267,3 +1256,195 @@ body.drawer-open .drawer { transform: translateX(0); }
   font-weight: 600;
 }
 .auth-back:hover { color: var(--blue-600); }
+
+/* --------------------------------------------------------------------------
+   Inner-page icon system
+   FS.icon() emits a bare 24x24 <svg> carrying no width or height of its own,
+   so every context that renders one has to say how big it is. Without a rule
+   the browser falls back to the 300x150 default for a replaced element and a
+   single glyph swallows the card it sits in — which is exactly what the
+   industries index, the vehicle detail tiles, the careers chips and the blog
+   byline were doing, because the classes they borrowed (.kpi-icon, .kpi) are
+   defined in dashboard.css and the public pages never load it.
+
+   Beyond the sizing, the badges share one recipe: a gradient plate, a hairline
+   ring, a soft tinted shadow and a white top-edge highlight, with a radial
+   sheen laid over the plate by ::after. The glyph rides above the sheen on
+   z-index 1. On hover the plate lifts and turns solid brand blue, so the icon
+   reads as part of the card rather than a sticker dropped on top of it.
+   -------------------------------------------------------------------------- */
+
+/* The pale plate — feature rows and marketing tiles. */
+.tile-ico,
+.feature i {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: 52px;
+  height: 52px;
+  border-radius: 16px;
+  background: linear-gradient(158deg, #f7faff 0%, var(--blue-100) 100%);
+  border: 1px solid rgba(18, 114, 240, .16);
+  color: var(--blue-600);
+  box-shadow: 0 2px 6px rgba(11, 18, 32, .05), inset 0 1px 0 #fff;
+  --sheen: rgba(255, 255, 255, .82);
+  transition: transform var(--transition), box-shadow var(--transition),
+              color var(--transition);
+}
+
+/* The brand fill fades in on its own layer rather than swapping `background`:
+   gradients do not interpolate, so a straight swap would snap mid-transition.
+   Inset by 1px so the fill covers the hairline ring instead of haloing it. */
+.tile-ico::before,
+.feature i::before {
+  content: "";
+  position: absolute;
+  inset: -1px;
+  border-radius: inherit;
+  background: var(--grad-blue);
+  opacity: 0;
+  transition: opacity var(--transition);
+  pointer-events: none;
+}
+.tile:hover .tile-ico::before,
+.feature:hover i::before { opacity: 1; }
+
+/* Sheen. Sits under the glyph and never eats a click. Its strength rides on
+   --sheen so a filled plate can dim the highlight that suits a pale one. */
+.tile-ico::after,
+.feature i::after,
+.svc-icon::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: radial-gradient(118% 96% at 18% 8%,
+              var(--sheen) 0%, rgba(255, 255, 255, 0) 62%);
+  pointer-events: none;
+}
+
+/* The glyph rides above the sheen. Sizes stay with each badge: the two service
+   card variants set their own, so only the plates are given one here. */
+.tile-ico > svg,
+.feature i > svg,
+.svc-icon > svg { position: relative; z-index: 1; }
+
+.tile-ico > svg,
+.feature i > svg { width: 25px; height: 25px; }
+
+/* Filled variants. --navy carries the industries index; the plate still turns
+   brand blue on hover so every tile answers the pointer the same way. */
+.tile-ico--navy {
+  background: linear-gradient(158deg, #0d508f 0%, var(--navy-800) 100%);
+  border-color: transparent;
+  color: #fff;
+  --sheen: rgba(255, 255, 255, .3);
+  box-shadow: 0 6px 16px rgba(2, 34, 74, .26), inset 0 1px 0 rgba(255, 255, 255, .18);
+}
+
+.tile:hover .tile-ico,
+.feature:hover i {
+  transform: translateY(-2px);
+  --sheen: rgba(255, 255, 255, .3);
+  color: #fff;
+  box-shadow: var(--sh-blue);
+}
+
+/* The arrow trails the plate, matching .svc-link on the service cards. */
+.tile-link svg { transition: transform var(--transition); }
+.tile:hover .tile-link svg { transform: translateX(4px); }
+
+/* Service card badge. Geometry lives with each card variant above; this only
+   paints it, and deliberately sets no `display` so the compact phone card can
+   keep the icon hidden. The ring is white rather than blue because this plate
+   sits on a photograph and needs to separate from whatever is behind it. */
+.svc-icon {
+  background: var(--grad-blue);
+  border: 1px solid rgba(255, 255, 255, .28);
+  color: #fff;
+  --sheen: rgba(255, 255, 255, .34);
+  box-shadow: 0 10px 24px rgba(3, 24, 62, .4), inset 0 1px 0 rgba(255, 255, 255, .34);
+  transition: transform var(--transition), box-shadow var(--transition);
+}
+.svc-card:hover .svc-icon {
+  transform: translateY(-2px) scale(1.05);
+  box-shadow: 0 14px 30px rgba(3, 24, 62, .46), inset 0 1px 0 rgba(255, 255, 255, .34);
+}
+
+/* Blog byline in the hero — icon and text on one baseline. */
+.hero-meta { display: inline-flex; align-items: center; gap: 8px; }
+.hero-meta svg { width: 16px; height: 16px; flex: none; opacity: .85; }
+
+/* FAQ accordion. Padding shrinks the 24x24 viewBox inside a 34px disc, so the
+   plus keeps its optical weight; rotating it 45deg turns it into a close X. */
+.faq-q svg {
+  box-sizing: border-box;
+  flex: none;
+  width: 34px;
+  height: 34px;
+  padding: 7px;
+  border-radius: 50%;
+  background: var(--blue-050);
+  border: 1px solid var(--blue-100);
+  color: var(--blue-600);
+  transition: transform var(--transition), background var(--transition),
+              border-color var(--transition), color var(--transition);
+}
+.faq-q:hover svg { background: var(--blue-100); }
+.faq-item.is-open .faq-q svg {
+  transform: rotate(45deg);
+  background: var(--grad-blue);
+  border-color: transparent;
+  color: #fff;
+}
+
+/* Empty states on the public side only — the dashboards keep the flat grey
+   glyph components.css gives them, so this is scoped to the marketing shell. */
+#pageBody .empty-state > svg {
+  box-sizing: border-box;
+  width: 76px;
+  height: 76px;
+  padding: 21px;
+  margin: 0 auto var(--sp-5);
+  border-radius: 50%;
+  background: linear-gradient(158deg, #f7faff 0%, var(--blue-100) 100%);
+  border: 1px solid rgba(18, 114, 240, .14);
+  color: var(--blue-500);
+  box-shadow: inset 0 1px 0 #fff;
+}
+
+/* Figure cards on the industry and service-area pages. These also used to
+   borrow .kpi from dashboard.css and so arrived completely unstyled. */
+.stat-tile {
+  padding: var(--sp-6) var(--sp-5);
+  text-align: center;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  box-shadow: var(--sh-xs);
+}
+.stat-tile-value {
+  font-size: 2.2rem;
+  font-weight: 800;
+  line-height: 1.1;
+  letter-spacing: -0.02em;
+  color: var(--navy-700);
+}
+/* Progressive enhancement: the ramp only replaces the flat navy where the
+   browser can clip a background to the glyphs. */
+@supports (-webkit-background-clip: text) or (background-clip: text) {
+  .stat-tile-value {
+    background: linear-gradient(180deg, var(--blue-500) 0%, var(--navy-700) 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+}
+.stat-tile-label {
+  margin-top: var(--sp-2);
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  color: var(--ink-500);
+}
