@@ -865,29 +865,38 @@ body.drawer-open .drawer { transform: translateX(0); }
 .tile-link { display: inline-flex; align-items: center; gap: 7px; color: var(--blue-600); font-weight: 600; font-size: var(--fs-base); }
 .tile-link svg { width: 16px; height: 16px; }
 
-/* Figure list — the "by the numbers" card on About. Label on the left, value
-   hard against the right edge, both sitting on one baseline. The dashboard
-   sheet does this same job with .money-row, but dashboard.css is not loaded
-   out here on the public side, so these rows carry their own rule. */
+/* Figure list — the "by the numbers" card on About. Plate and label on the
+   left, the figure hard against the card's right edge, all three on one row.
+   The dashboard sheet does this same job with .money-row, but dashboard.css is
+   not loaded out here on the public side, so these rows carry their own rule. */
 .figure-list { display: grid; margin-bottom: var(--sp-6); }
 .figure-row {
   display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: var(--sp-5);
-  padding: 13px 0;
+  align-items: center;
+  gap: var(--sp-4);
+  padding: var(--sp-3) 0;
 }
 .figure-row:first-child { padding-top: 0; }
 .figure-row + .figure-row { border-top: 1px dashed var(--line); }
-.figure-row > span { color: var(--ink-500); font-size: var(--fs-base); font-weight: 600; line-height: 1.35; }
+/* The label takes up the slack, which is what carries the figure out to the
+   right edge however wide the card is sitting. */
+.figure-row span {
+  flex: 1;
+  min-width: 0;
+  color: var(--ink-500);
+  font-size: var(--fs-md);
+  font-weight: 600;
+  line-height: 1.35;
+}
 /* Tabular figures line 10,000 and 250,000 up digit for digit down the column,
    and nowrap keeps a long label from pushing its number onto a line of its own. */
-.figure-row > strong {
+.figure-row strong {
   flex: none;
   color: var(--navy-800);
   font-size: var(--fs-xl);
   font-weight: 800;
-  line-height: 1.2;
+  line-height: 1.15;
+  letter-spacing: -0.01em;
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
@@ -1343,6 +1352,10 @@ body.drawer-open .drawer { transform: translateX(0); }
   --sheen: rgba(255, 255, 255, .3);
   box-shadow: 0 6px 16px rgba(2, 34, 74, .26), inset 0 1px 0 rgba(255, 255, 255, .18);
 }
+
+/* Compact plate for the tight rails — the About figures card. */
+.tile-ico--sm { width: 40px; height: 40px; border-radius: 12px; }
+.tile-ico--sm > svg { width: 20px; height: 20px; }
 
 .tile:hover .tile-ico,
 .feature:hover i {

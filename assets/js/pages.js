@@ -701,14 +701,15 @@
     applyCmsPage('about');
     body.innerHTML =
       section(
-        '<div class="split split--2-1" style="gap:var(--sp-8)">' +
+        '<div class="" style="gap:var(--sp-8)">' +
           // Written in Admin → CMS Pages → About Us.
           '<div class="prose">' + cmsProse('about') + '</div>' +
           '<div class="card"><div class="card-body">' +
             '<h4 class="mb-4">FleetSquad by the numbers</h4>' +
-            // Label left, figure right, on the shared baseline .figure-row draws.
+            // Plate and label on the left, figure hard against the card's right edge.
             '<div class="figure-list">' + D.stats.map(function (s) {
-              return '<div class="figure-row"><span>' + FS.esc(s.label) + '</span>' +
+              return '<div class="figure-row"><i class="tile-ico tile-ico--sm">' + FS.icon(s.icon) + '</i>' +
+                '<span>' + FS.esc(s.label) + '</span>' +
                 '<strong>' + (s.decimal ? s.value : FS.num(s.value)) + s.suffix + '</strong></div>';
             }).join('') + '</div>' +
             '<a class="btn btn-primary btn-block mt-5" href="' + FS.url(FS.data.links.estimate) + '">Get Estimate</a>' +
